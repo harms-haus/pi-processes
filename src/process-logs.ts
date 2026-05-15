@@ -11,6 +11,12 @@ export interface LogQueryOptions {
 	start?: number;
 	/** Return lines to end (1-indexed, inclusive) */
 	end?: number;
+	/** Filter log lines matching a pattern */
+	grep?: string;
+	/** Treat grep pattern as a literal string (escape regex metacharacters) */
+	grepLiteral?: boolean;
+	/** Case-insensitive grep matching */
+	grepIgnoreCase?: boolean;
 }
 
 export interface LogQueryResult {
@@ -24,8 +30,13 @@ export interface LogQueryResult {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
+/** Escape special regex metacharacters in a string for use in RegExp constructor */
+function escapeRegex(str: string): string {
+	return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function formatLine(entry: LogEntry, lineNum: number): string {
-	return `[${lineNum}] ${entry.timestamp} [${entry.stream}] ${entry.text}`;
+	return `[${lineNum}] +${entry.timestamp}ms [${entry.stream}] ${entry.text}`;
 }
 
 // ── Public API ──────────────────────────────────────────────────────────────
@@ -41,7 +52,7 @@ export function queryLogs(
 	options: LogQueryOptions,
 ): LogQueryResult {
 	const totalLines = logs.length;
-	const { head, tail, start, end } = options;
+	const { head, tail, start, end, grep, grepLiteral, grepIgnoreCase } = options;
 
 	const hasHead = head !== undefined;
 	const hasTail = tail !== undefined;
@@ -73,38 +84,58 @@ export function queryLogs(
 		throw new Error("end must be >= start");
 	}
 
-	// Determine slice range (0-indexed, end exclusive)
+	// If grep is provided, filter entries first (before positional slicing)
+	let filteredLogs: Array<{ entry: LogEntry; originalIndex: number }>;
+	if (grep) {
+		const flags = grepIgnoreCase ? "i" : "";
+		const regex = grepLiteral
+			? new RegExp(escapeRegex(grep), flags)
+			: new RegExp(grep, flags);
+		filteredLogs = [];
+		for (let i = 0; i < logs.length; i++) {
+			if (regex.test(logs[i].text)) {
+				filteredLogs.push({ entry: logs[i], originalIndex: i });
+			}
+		}
+	} else {
+		filteredLogs = logs.map((entry, originalIndex) => ({ entry, originalIndex }));
+	}
+
+	const filteredCount = filteredLogs.length;
+
+	// Determine slice range (0-indexed, end exclusive) on filtered array
 	let sliceStart = 0;
-	let sliceEnd = totalLines;
+	let sliceEnd = filteredCount;
 
 	if (hasHead) {
-		sliceEnd = Math.min(head, totalLines);
+		sliceEnd = Math.min(head, filteredCount);
 	} else if (hasTail) {
-		const count = Math.min(tail, totalLines);
-		sliceStart = totalLines - count;
+		const count = Math.min(tail, filteredCount);
+		sliceStart = filteredCount - count;
 	} else if (hasStart || hasEnd) {
 		if (hasStart) {
 			sliceStart = start - 1; // convert 1-indexed to 0-indexed
 		}
 		if (hasEnd) {
-			sliceEnd = Math.min(end, totalLines);
+			sliceEnd = Math.min(end, filteredCount);
 		}
 		// Clamp
 		sliceStart = Math.max(sliceStart, 0);
-		if (sliceStart >= totalLines) {
-			sliceStart = totalLines;
-			sliceEnd = totalLines;
+		if (sliceStart >= filteredCount) {
+			sliceStart = filteredCount;
+			sliceEnd = filteredCount;
 		}
 		if (sliceEnd < sliceStart) {
 			sliceEnd = sliceStart;
 		}
 	}
-	// else: no options → return all (sliceStart=0, sliceEnd=totalLines)
+	// else: no options → return all (sliceStart=0, sliceEnd=filteredCount)
 
 	const count = sliceEnd - sliceStart;
 	const parts = new Array<string>(count);
 	for (let i = 0; i < count; i++) {
-		parts[i] = formatLine(logs[sliceStart + i], sliceStart + i + 1);
+		const { entry, originalIndex } = filteredLogs[sliceStart + i];
+		parts[i] = formatLine(entry, originalIndex + 1);
 	}
 
 	return {

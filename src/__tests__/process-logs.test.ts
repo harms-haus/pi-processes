@@ -182,15 +182,15 @@ describe("queryLogs", () => {
 		const logs = [makeLog("Hello", "stdout", 1000)];
 		const result = queryLogs(logs, {});
 
-		// Should have format: [1] <timestamp> [stdout] Hello
-		expect(result.text).toMatch(/^\[1\] 1000 \[stdout\] Hello$/);
+		// Should have format: [1] +<timestamp>ms [stdout] Hello
+		expect(result.text).toMatch(/^\[1\] \+1000ms \[stdout\] Hello$/);
 	});
 
 	it("formats stderr entries correctly", () => {
 		const logs = [makeLog("Error!", "stderr", 500)];
 		const result = queryLogs(logs, {});
 
-		expect(result.text).toMatch(/^\[1\] 500 \[stderr\] Error!$/);
+		expect(result.text).toMatch(/^\[1\] \+500ms \[stderr\] Error!$/);
 	});
 
 	// Clamp: start beyond total returns empty
@@ -212,5 +212,136 @@ describe("queryLogs", () => {
 		expect(result.returnedLines).toBe(3); // lines 3, 4, 5
 		expect(result.text).toContain("[3]");
 		expect(result.text).toContain("[5]");
+	});
+
+	// ── grep filter tests ─────────────────────────────────────────────────
+
+	it("filters by regex pattern", () => {
+		const logs = makeLogs(10);
+		const result = queryLogs(logs, { grep: "Line [3-5]" });
+
+		expect(result.totalLines).toBe(10);
+		expect(result.returnedLines).toBe(3);
+		expect(result.text).toContain("[3]");
+		expect(result.text).toContain("[4]");
+		expect(result.text).toContain("[5]");
+		expect(result.text).not.toContain("[1]");
+		expect(result.text).not.toContain("[10]");
+	});
+
+	it("grepLiteral escapes regex metacharacters", () => {
+		const logs = [
+			makeLog("error.code"),
+			makeLog("errorXcode"),
+		];
+		const result = queryLogs(logs, { grep: "error.code", grepLiteral: true });
+
+		expect(result.returnedLines).toBe(1);
+		expect(result.text).toContain("error.code");
+		expect(result.text).not.toContain("errorXcode");
+	});
+
+	it("grepIgnoreCase matches case-insensitively", () => {
+		const logs = [
+			makeLog("Error"),
+			makeLog("ERROR"),
+			makeLog("error"),
+			makeLog("warning"),
+		];
+		const result = queryLogs(logs, { grep: "error", grepIgnoreCase: true });
+
+		expect(result.returnedLines).toBe(3);
+		expect(result.text).toContain("Error");
+		expect(result.text).toContain("ERROR");
+		expect(result.text).toContain("error");
+		expect(result.text).not.toContain("warning");
+	});
+
+	it("grep combined with head slices filtered results", () => {
+		const logs = makeLogs(10);
+		const result = queryLogs(logs, { grep: "Line", head: 3 });
+
+		expect(result.totalLines).toBe(10);
+		expect(result.returnedLines).toBe(3);
+		expect(result.text).toContain("[1]");
+		expect(result.text).toContain("[3]");
+		expect(result.text).not.toContain("[4]");
+	});
+
+	it("grep combined with tail slices filtered results", () => {
+		const logs = makeLogs(10);
+		const result = queryLogs(logs, { grep: "Line", tail: 2 });
+
+		expect(result.totalLines).toBe(10);
+		expect(result.returnedLines).toBe(2);
+		expect(result.text).toContain("[9]");
+		expect(result.text).toContain("[10]");
+		expect(result.text).not.toContain("[8]");
+	});
+
+	it("grep combined with start+end slices filtered results", () => {
+		// 10 logs, grep "Line" matches all 10; start=2, end=4 → entries 2-4 (3 results)
+		const logs = makeLogs(10);
+		const result = queryLogs(logs, { grep: "Line", start: 2, end: 4 });
+
+		expect(result.totalLines).toBe(10);
+		expect(result.returnedLines).toBe(3);
+		expect(result.text).toContain("[2]");
+		expect(result.text).toContain("[4]");
+		expect(result.text).not.toContain("[1]");
+		expect(result.text).not.toContain("[5]");
+	});
+
+	it("grep returns empty when no matches", () => {
+		const logs = makeLogs(10);
+		const result = queryLogs(logs, { grep: "NOTFOUND" });
+
+		expect(result.totalLines).toBe(10);
+		expect(result.returnedLines).toBe(0);
+		expect(result.text).toBe("");
+	});
+
+	it("grep preserves original line numbers after filtering", () => {
+		const logs = makeLogs(10);
+		const result = queryLogs(logs, { grep: "Line [257]" });
+
+		expect(result.returnedLines).toBe(3);
+		// Should show original line numbers, not renumbered
+		expect(result.text).toContain("[2]");
+		expect(result.text).toContain("[5]");
+		expect(result.text).toContain("[7]");
+		// Should NOT show renumbered versions
+		expect(result.text).not.toContain("[1]");
+		expect(result.text).not.toContain("[3]");
+		expect(result.text).not.toContain("[4]");
+		expect(result.text).not.toContain("[6]");
+	});
+
+	it("grep on empty logs returns empty", () => {
+		const result = queryLogs([], { grep: "anything" });
+
+		expect(result.totalLines).toBe(0);
+		expect(result.returnedLines).toBe(0);
+		expect(result.text).toBe("");
+	});
+
+	it("grepLiteral + grepIgnoreCase combined", () => {
+		const logs = [
+			makeLog("error"),
+			makeLog("ERROR"),
+			makeLog("erroR"),
+			makeLog("failure"),
+		];
+		const result = queryLogs(logs, {
+			grep: "ERROR",
+			grepLiteral: true,
+			grepIgnoreCase: true,
+		});
+
+		expect(result.returnedLines).toBe(3);
+		expect(result.text).toContain("error");
+		expect(result.text).toContain("ERROR");
+		expect(result.text).toContain("erroR");
+		expect(result.text).not.toContain("failure");
 	});
 });

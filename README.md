@@ -164,7 +164,7 @@ Process 'api-server' killed (PID 12345). Total runtime: 342.1s
 
 ### `process_logs`
 
-Read captured log output from a managed process. Supports four mutually exclusive query modes: head, tail, or start/end range.
+Read captured log output from a managed process. Supports three positional query modes (head, tail, or start/end range) plus optional grep filtering that can be combined with any positional mode.
 
 | Parameter | Type   | Required | Default | Description                                         |
 |-----------|--------|----------|---------|-----------------------------------------------------|
@@ -172,9 +172,12 @@ Read captured log output from a managed process. Supports four mutually exclusiv
 | `head`    | number | No       | —       | Return the first N lines.                           |
 | `tail`    | number | No       | —       | Return the last N lines.                            |
 | `start`   | number | No       | —       | Start line number (1-based, inclusive).             |
-| `end`     | number | No       | —       | End line number (1-based, inclusive).               |
+| `end`     | number | No       | —       | End line number (1-based, inclusive).             |
+| `grep`           | string  | No       | —       | Filter log lines by regex pattern.                  |
+| `grepLiteral`    | boolean | No       | `false` | Treat grep pattern as a literal string.             |
+| `grepIgnoreCase` | boolean | No       | `false` | Case-insensitive grep matching.                     |
 
-**Constraint:** `head`, `tail`, and `start`/`end` cannot be combined. Specifying both `head` and `tail`, or `head`/`tail` with `start`/`end`, throws an error.
+**Constraint:** `head`, `tail`, and `start`/`end` are mutually exclusive positional modes — they cannot be combined with each other. The `grep`/`grepLiteral`/`grepIgnoreCase` parameters are independent and can be used with any positional mode or on their own.
 
 **Returns** `ProcessLogsResult`:
 
@@ -189,10 +192,10 @@ Read captured log output from a managed process. Supports four mutually exclusiv
 Each log line is formatted as:
 
 ```
-[lineNum] timestamp [stream] text
+[lineNum] +Nms [stream] text
 ```
 
-Where `timestamp` is milliseconds since process start and `stream` is `stdout` or `stderr`.
+Where `+Nms` is milliseconds since process start and `stream` is `stdout` or `stderr`.
 
 **Examples:**
 
@@ -208,6 +211,24 @@ process_logs(name="api-server", start=20, end=35)
 
 // All logs
 process_logs(name="api-server")
+```
+
+#### Grep Examples
+
+Filter logs by regex pattern:
+
+```
+// Find all lines containing "error" (case-insensitive)
+process_logs(name="api-server", grep="error", grepIgnoreCase=true)
+
+// Filter for a literal string containing regex metacharacters
+process_logs(name="api-server", grep="[WARN]", grepLiteral=true)
+
+// Combine grep with tail — last 5 lines matching "ECONNREFUSED"
+process_logs(name="api-server", grep="ECONNREFUSED", tail=5)
+
+// Grep across a line range
+process_logs(name="api-server", grep="timeout", start=100, end=200)
 ```
 
 ---

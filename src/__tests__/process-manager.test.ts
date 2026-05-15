@@ -589,4 +589,110 @@ describe("ProcessManager", () => {
 			expect(result.name).toBe("test");
 		});
 	});
+
+	// ── onProcessCountChange() ────────────────────────────────────────────
+
+	describe("onProcessCountChange()", () => {
+		it("emits immediately with current count", () => {
+			const callback = vi.fn();
+			pm.onProcessCountChange(callback);
+			expect(callback).toHaveBeenCalledWith(0);
+			expect(callback).toHaveBeenCalledTimes(1);
+		});
+
+		it("emits after start", async () => {
+			const callback = vi.fn();
+			pm.onProcessCountChange(callback);
+			callback.mockClear();
+
+			await startAndResolve(pm, "test", "echo hi");
+
+			expect(callback).toHaveBeenCalledWith(1);
+		});
+
+		it("emits after kill", async () => {
+			const callback = vi.fn();
+			pm.onProcessCountChange(callback);
+			callback.mockClear();
+
+			await startAndResolve(pm, "test", "sleep 10");
+			callback.mockClear();
+
+			await pm.kill("test");
+
+			expect(callback).toHaveBeenCalledWith(0);
+		});
+
+		it("emits correct count with multiple processes", async () => {
+			const callback = vi.fn();
+			pm.onProcessCountChange(callback);
+			callback.mockClear();
+
+			await startAndResolve(pm, "a", "cmd-a");
+			await startAndResolve(pm, "b", "cmd-b");
+			await startAndResolve(pm, "c", "cmd-c");
+
+			expect(callback).toHaveBeenCalledWith(1);
+			expect(callback).toHaveBeenCalledWith(2);
+			expect(callback).toHaveBeenCalledWith(3);
+		});
+
+		it("emits after restart", async () => {
+			const callback = vi.fn();
+			pm.onProcessCountChange(callback);
+			callback.mockClear();
+
+			await startAndResolve(pm, "test", "echo v1");
+
+			const cp2 = createMockChildProcess();
+			mockSpawn.mockReturnValue(cp2);
+
+			callback.mockClear();
+
+			const promise = pm.restart("test", undefined, 1);
+			// Flush microtasks so kill resolves
+			for (let i = 0; i < 10; i++) await Promise.resolve();
+			vi.advanceTimersByTime(1000);
+			await promise;
+
+			// Restart kills (count goes to 0) then starts (count goes to 1)
+			expect(callback).toHaveBeenCalledWith(0);
+			expect(callback).toHaveBeenCalledWith(1);
+		});
+
+		it("emits 0 after shutdown", async () => {
+			const callback = vi.fn();
+			pm.onProcessCountChange(callback);
+			callback.mockClear();
+
+			await startAndResolve(pm, "a", "sleep 10");
+			await startAndResolve(pm, "b", "sleep 10");
+
+			callback.mockClear();
+
+			await pm.shutdown();
+
+			expect(callback).toHaveBeenCalledWith(0);
+		});
+
+		it("callback can be replaced", async () => {
+			const callbackA = vi.fn();
+			const callbackB = vi.fn();
+
+			pm.onProcessCountChange(callbackA);
+			expect(callbackA).toHaveBeenCalledWith(0);
+
+			pm.onProcessCountChange(callbackB);
+			expect(callbackB).toHaveBeenCalledWith(0);
+
+			callbackA.mockClear();
+			callbackB.mockClear();
+
+			await startAndResolve(pm, "test", "echo hi");
+
+			// Only the latest callback (B) should fire
+			expect(callbackA).not.toHaveBeenCalled();
+			expect(callbackB).toHaveBeenCalledWith(1);
+		});
+	});
 });

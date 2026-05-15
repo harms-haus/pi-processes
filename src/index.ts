@@ -9,7 +9,7 @@
  *   restart_process   — Restart a managed process
  */
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { ProcessManager } from "./process-manager.js";
 import { createStartProcessTool } from "./tools/start-process.js";
 import { createListProcessesTool } from "./tools/list-processes.js";
@@ -19,6 +19,7 @@ import { createRestartProcessTool } from "./tools/restart-process.js";
 
 export default function (pi: ExtensionAPI) {
   let manager: ProcessManager | null = null;
+  let currentCtx: ExtensionContext | null = null;
 
   const getManager = (): ProcessManager => {
     if (!manager) {
@@ -30,6 +31,14 @@ export default function (pi: ExtensionAPI) {
   // ── Session lifecycle ───────────────────────────────────────────────
   pi.on("session_start", async (_event, ctx) => {
     manager = new ProcessManager();
+    currentCtx = ctx;
+
+    manager.onProcessCountChange((count) => {
+      if (currentCtx?.hasUI) {
+        currentCtx.ui.setStatus("pi-processes", `p: ${count}`);
+      }
+    });
+
     if (ctx.hasUI) {
       ctx.ui.notify("pi-processes loaded", "info");
     }
@@ -40,6 +49,10 @@ export default function (pi: ExtensionAPI) {
       await manager.shutdown();
       manager = null;
     }
+    if (currentCtx?.hasUI) {
+      currentCtx.ui.setStatus("pi-processes", undefined);
+    }
+    currentCtx = null;
   });
 
   // ── Tool registration ───────────────────────────────────────────────

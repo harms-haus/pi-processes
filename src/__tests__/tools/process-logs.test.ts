@@ -244,4 +244,125 @@ describe("createProcessLogsTool", () => {
 
 		expect((result.content[0] as { type: "text"; text: string }).text).toBe("(no logs)");
 	});
+
+	// ── Grep pass-through tests ─────────────────────────────────────────────
+
+	// 1. execute passes grep to queryLogs
+	it("execute passes grep to queryLogs", async () => {
+		const grepLogs: LogEntry[] = [
+			makeLog("hello world"),
+			makeLog("error: something failed"),
+			makeLog("info: all good"),
+			makeLog("error: another failure"),
+		];
+		const manager = mockManager(grepLogs);
+		const tool = createProcessLogsTool(() => manager);
+
+		const result = await tool.execute(
+			"call-grep",
+			{ name: "test-proc", grep: "error" },
+			undefined,
+			undefined,
+			undefined as any,
+		);
+
+		const text = (result.content[0] as { type: "text"; text: string }).text;
+		expect(text).toContain("error: something failed");
+		expect(text).toContain("error: another failure");
+		expect(text).not.toContain("hello world");
+		expect(text).not.toContain("info: all good");
+	});
+
+	// 2. execute passes grepLiteral to queryLogs
+	it("execute passes grepLiteral to queryLogs", async () => {
+		const grepLogs: LogEntry[] = [
+			makeLog("foo.bar"),
+			makeLog("fooXbar"),
+		];
+		const manager = mockManager(grepLogs);
+		const tool = createProcessLogsTool(() => manager);
+
+		const result = await tool.execute(
+			"call-grep-literal",
+			{ name: "test-proc", grep: "foo.bar", grepLiteral: true },
+			undefined,
+			undefined,
+			undefined as any,
+		);
+
+		const text = (result.content[0] as { type: "text"; text: string }).text;
+		expect(text).toContain("foo.bar");
+		expect(text).not.toContain("fooXbar");
+	});
+
+	// 3. execute passes grepIgnoreCase to queryLogs
+	it("execute passes grepIgnoreCase to queryLogs", async () => {
+		const grepLogs: LogEntry[] = [
+			makeLog("ERROR: critical"),
+			makeLog("error: minor"),
+			makeLog("info: ok"),
+		];
+		const manager = mockManager(grepLogs);
+		const tool = createProcessLogsTool(() => manager);
+
+		const result = await tool.execute(
+			"call-grep-ignore-case",
+			{ name: "test-proc", grep: "ERROR", grepIgnoreCase: true },
+			undefined,
+			undefined,
+			undefined as any,
+		);
+
+		const text = (result.content[0] as { type: "text"; text: string }).text;
+		expect(text).toContain("ERROR: critical");
+		expect(text).toContain("error: minor");
+		expect(text).not.toContain("info: ok");
+	});
+
+	// 4. renderCall shows grep pattern
+	it("renderCall shows grep pattern", () => {
+		const tool = createProcessLogsTool(() => mockManager([]));
+		const theme = mockTheme();
+
+		const component = tool.renderCall!(
+			{ name: "myapp", grep: "error" },
+			theme as any,
+			undefined as any,
+		);
+
+		const str = renderToString(component);
+		expect(str).toContain("grep(\"error\")");
+	});
+
+	// 5. renderCall shows grep + head
+	it("renderCall shows grep + head", () => {
+		const tool = createProcessLogsTool(() => mockManager([]));
+		const theme = mockTheme();
+
+		const component = tool.renderCall!(
+			{ name: "myapp", grep: "error", head: 5 },
+			theme as any,
+			undefined as any,
+		);
+
+		const str = renderToString(component);
+		expect(str).toContain("grep(\"error\")");
+		expect(str).toContain("head(5)");
+	});
+
+	// 6. renderCall shows grep + tail
+	it("renderCall shows grep + tail", () => {
+		const tool = createProcessLogsTool(() => mockManager([]));
+		const theme = mockTheme();
+
+		const component = tool.renderCall!(
+			{ name: "myapp", grep: "warn", tail: 10 },
+			theme as any,
+			undefined as any,
+		);
+
+		const str = renderToString(component);
+		expect(str).toContain("grep(\"warn\")");
+		expect(str).toContain("tail(10)");
+	});
 });

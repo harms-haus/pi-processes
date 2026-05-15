@@ -23,8 +23,22 @@ import {
 export class ProcessManager {
 	private processes: Map<string, ProcessRecord>;
 
+	/** Callback invoked when the process count changes */
+	private processCountCallback?: (count: number) => void;
+
 	constructor() {
 		this.processes = new Map();
+	}
+
+	/** Register a callback to be invoked whenever the managed process count changes */
+	onProcessCountChange(callback: (count: number) => void): void {
+		this.processCountCallback = callback;
+		this.emitProcessCount();
+	}
+
+	/** Emit the current process count via the registered callback */
+	private emitProcessCount(): void {
+		this.processCountCallback?.(this.processes.size);
 	}
 
 	/** Get count of managed processes */
@@ -110,6 +124,7 @@ export class ProcessManager {
 		};
 
 		this.processes.set(name, record);
+		this.emitProcessCount();
 
 		// Debounce reset function — each output resets the silence timer
 		const resetDebounce = () => {
@@ -232,6 +247,7 @@ export class ProcessManager {
 
 		if (record.exited) {
 			this.processes.delete(name);
+			this.emitProcessCount();
 			return {
 				name,
 				pid: record.pid,
@@ -250,6 +266,7 @@ export class ProcessManager {
 				clearTimeout(sigkillTimer);
 				record.process.removeListener("exit", onExit);
 				this.processes.delete(name);
+				this.emitProcessCount();
 				resolve({
 					name,
 					pid: record.pid,
@@ -298,5 +315,6 @@ export class ProcessManager {
 		const names = Array.from(this.processes.keys());
 		await Promise.allSettled(names.map((name) => this.kill(name)));
 		this.processes.clear();
+		this.emitProcessCount();
 	}
 }

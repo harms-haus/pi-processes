@@ -46,7 +46,7 @@ Returns name, PID, command, uptime, log line count, and startup status (`ready` 
 
 ### `process_logs`
 
-Use to inspect output from a running or recently-killed process. Three mutually exclusive query modes:
+Use to inspect output from a running or recently-killed process. Three mutually exclusive positional modes:
 
 | Mode | Parameters | Example |
 |---|---|---|
@@ -54,7 +54,42 @@ Use to inspect output from a running or recently-killed process. Three mutually 
 | **tail** | `tail=N` | Last 50 lines: `process_logs(name="api", tail=50)` |
 | **range** | `start=N`, `end=M` | Lines 100–120: `process_logs(name="api", start=100, end=120)` |
 
-Log lines are formatted as: `[lineNum] timestamp [stdout|stderr] text`
+All positional modes can be combined with **grep filters** (see below). Grep is applied before head/tail/start/end, so you can search the full log and then slice the matching results.
+
+### Grep Parameters
+
+| Parameter | Type | Description |
+|---|---|---|
+| `grep` | string (optional) | Filter log lines by regex pattern. Applied **before** head/tail/start/end. |
+| `grepLiteral` | boolean (optional) | If `true`, treat the grep pattern as a literal string instead of regex. |
+| `grepIgnoreCase` | boolean (optional) | If `true`, perform case-insensitive matching. |
+
+### Grep Examples
+
+```
+# Find all lines containing "ERROR"
+process_logs(name="api", grep="ERROR")
+
+# Last 20 lines matching "error" (case-insensitive)
+process_logs(name="api", grep="error", grepIgnoreCase=true, tail=20)
+
+# Literal string match (special chars not interpreted as regex)
+process_logs(name="api", grep="Connection refused", grepLiteral=true)
+
+# Regex alternation with head limit
+process_logs(name="server", grep="timeout|refused", head=50)
+```
+
+### Log Line Format
+
+Log lines are formatted as: `[lineNum] +Nms [stdout|stderr] text`
+
+- `lineNum` — 1-based line number within the process log buffer
+- `+Nms` — milliseconds elapsed since the process started
+- `[stdout|stderr]` — which stream produced the line
+- `text` — the actual log output
+
+Example: `[1] +1000ms [stdout] Server listening on port 3000`
 
 Use `stderr` lines to identify errors. Look for keywords: `Error`, `EADDRINUSE`, `ENOENT`, `TypeError`, `Unhandled`, `FATAL`.
 
@@ -140,7 +175,7 @@ The `start_delay` parameter controls how long the tool waits for log silence bef
 
 ## Reading Logs for Debugging
 
-Log format per line: `[lineNum] timestamp [stdout|stderr] text`
+Log format per line: `[lineNum] +Nms [stdout|stderr] text`
 
 **Quick triage checklist:**
 

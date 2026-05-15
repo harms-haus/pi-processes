@@ -17,12 +17,16 @@ export function createProcessLogsTool(
 		name: "process_logs",
 		label: "Process Logs",
 		description:
-			"Read log output from a managed process. Use head/tail for line counts, or start/end for line ranges.",
+			"Read log output from a managed process. Use head/tail for line counts, start/end for line ranges, and grep to filter by pattern.",
 		promptSnippet: "Read logs from a managed process",
 		promptGuidelines: [
 			"Use process_logs with head=N to get first N lines.",
 			"Use process_logs with tail=N to get last N lines.",
 			"Use process_logs with start and end for a line range (1-indexed).",
+			"Use process_logs with grep=\"pattern\" to filter log lines by regex pattern.",
+			"Set grepLiteral=true to treat the grep pattern as a literal string.",
+			"Set grepIgnoreCase=true for case-insensitive grep matching.",
+			"grep can be combined with head/tail/start+end to slice filtered results.",
 		],
 		parameters: ProcessLogsSchema,
 		async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
@@ -50,6 +54,9 @@ export function createProcessLogsTool(
 			if (hasTail) queryOptions.tail = params.tail;
 			if (hasStart) queryOptions.start = params.start;
 			if (hasEnd) queryOptions.end = params.end;
+			if (params.grep) queryOptions.grep = params.grep;
+			if (params.grepLiteral) queryOptions.grepLiteral = params.grepLiteral;
+			if (params.grepIgnoreCase) queryOptions.grepIgnoreCase = params.grepIgnoreCase;
 
 			const result = queryLogs(logs, queryOptions);
 			return {
@@ -62,17 +69,27 @@ export function createProcessLogsTool(
 			};
 		},
 		renderCall(args, theme) {
-			const mode = args.head
+			const grepPart = args.grep
+				? theme.fg("dim", `grep(${JSON.stringify(args.grep)})`)
+				: "";
+
+			const positionalMode = args.head
 				? `head(${args.head})`
 				: args.tail
 					? `tail(${args.tail})`
 					: args.start
 						? `[${args.start}-${args.end ?? "end"}]`
-						: "all";
+						: grepPart
+							? ""
+							: "all";
+
+			const separator = grepPart && positionalMode ? " + " : "";
+			const modeStr = grepPart + separator + (positionalMode ? theme.fg("dim", positionalMode) : "");
+
 			return new Text(
 				theme.fg("toolTitle", theme.bold("process_logs ")) +
 					theme.fg("accent", args.name) +
-					theme.fg("dim", ` ${mode}`),
+					(modeStr ? ` ${modeStr}` : ""),
 				0,
 				0,
 			);

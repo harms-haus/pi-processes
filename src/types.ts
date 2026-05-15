@@ -154,6 +154,18 @@ export const ProcessLogsSchema = Type.Object({
 	end: Type.Optional(
 		Type.Number({ description: "End line number (1-based, inclusive)" }),
 	),
+	grep: Type.Optional(
+		Type.String({ description: "Filter log lines by pattern (regex by default)" }),
+	),
+	grepLiteral: Type.Optional(
+		Type.Boolean({
+			description:
+				"Treat grep pattern as literal string instead of regex",
+		}),
+	),
+	grepIgnoreCase: Type.Optional(
+		Type.Boolean({ description: "Case-insensitive grep matching" }),
+	),
 });
 
 export const RestartProcessSchema = Type.Object({
