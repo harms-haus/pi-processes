@@ -33,9 +33,11 @@ export default function (pi: ExtensionAPI) {
     manager = new ProcessManager();
     currentCtx = ctx;
 
-    manager.onProcessCountChange((count) => {
+    const mgr = manager;
+    mgr.onProcessCountChange(() => {
       if (currentCtx?.hasUI) {
-        currentCtx.ui.setStatus("pi-processes", `p: ${count}`);
+        const names = mgr.list().map(p => p.name).join(", ");
+        currentCtx.ui.setStatus("pi-processes", names ? `p: ${names}` : "");
       }
     });
 
