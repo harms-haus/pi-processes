@@ -1,0 +1,25 @@
+{
+  "name": "pi-processes",
+  "version": "0.1.0",
+  "description": "Process definitions and utilities for the pi framework",
+  "main": "./src/index.ts",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "keywords": ["pi-package", "pi-extension", "processes"],
+  "pi": {
+    "extensions": ["./src/index.ts"]
+  },
+  "scripts": {
+    "lint": "biome check src/",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typebox": "^1.1.38",
+    "vitest": "^3.0.0",
+    "typescript": "^6.0.3"
+  }
+}
