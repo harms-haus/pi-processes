@@ -116,6 +116,14 @@ Returns total runtime. The process is gone — use `start_process` to bring it b
 
 ---
 
+## Visual Process Logs Dialog
+
+When a UI session is active (`ctx.hasUI`), users can press **`Ctrl+Alt+P`** to open a visual Process Logs dialog. This lets them browse captured logs interactively — selecting a process, scrolling output, and multi-selecting — without needing to call `process_logs`. Users can select log lines and insert them into the compose box with **`Ctrl+Enter`**.
+
+This is primarily a **user-facing capability**. Be aware that users may reference or paste log excerpts from this dialog rather than asking you to call `process_logs`. If a user shares logs they inspected visually, treat them the same as output from the tool.
+
+---
+
 ## Common Workflows
 
 ### Start Server → Check Logs → Debug

@@ -14,6 +14,7 @@ const MockProcessManager = vi.hoisted(() => {
 		onProcessCountChange: vi.fn(),
 		shutdown: vi.fn().mockResolvedValue(undefined),
 		list: vi.fn().mockReturnValue([]),
+		getLogs: vi.fn().mockReturnValue([]),
 	}));
 });
 
@@ -63,6 +64,28 @@ vi.mock("../tools/restart-process.js", () => ({
 	createRestartProcessTool,
 }));
 
+const mockLogDialog = vi.hoisted(() => vi.fn());
+vi.mock("../ui/log-dialog.js", () => ({
+	LogDialog: mockLogDialog,
+}));
+
+vi.mock("../ui/format-timestamp.js", () => ({
+	formatLogTimestamp: vi.fn((ms: number) => {
+		const totalSeconds = Math.floor(ms / 1000);
+		const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
+		const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
+		const seconds = String(totalSeconds % 60).padStart(2, "0");
+		const millis = String(ms % 1000).padStart(3, "0");
+		return `+${hours}:${minutes}:${seconds}.${millis}`;
+	}),
+}));
+
+vi.mock("@earendil-works/pi-tui", () => ({
+	Key: {
+		ctrlAlt: (key: string) => `ctrl+alt+${key}`,
+	},
+}));
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Create a minimal mock ExtensionAPI that captures event handlers and tools */
@@ -70,9 +93,11 @@ function createMockAPI(): {
 	api: ExtensionAPI;
 	handlers: Map<string, (...args: any[]) => any>;
 	tools: ToolDefinition<any>[];
+	shortcuts: Array<{ key: string; options: any }>;
 } {
 	const handlers = new Map<string, (...args: any[]) => any>();
 	const tools: ToolDefinition<any>[] = [];
+	const shortcuts: Array<{ key: string; options: any }> = [];
 
 	const api = {
 		on: vi.fn((event: string, handler: (...args: any[]) => any) => {
@@ -81,9 +106,12 @@ function createMockAPI(): {
 		registerTool: vi.fn((tool: ToolDefinition<any>) => {
 			tools.push(tool);
 		}),
+		registerShortcut: vi.fn((key: string, options: any) => {
+			shortcuts.push({ key, options });
+		}),
 	} as unknown as ExtensionAPI;
 
-	return { api, handlers, tools };
+	return { api, handlers, tools, shortcuts };
 }
 
 /** Create a mock ExtensionContext */
@@ -92,6 +120,8 @@ function createMockCtx(overrides?: Partial<ExtensionContext>): ExtensionContext 
 		ui: {
 			notify: vi.fn(),
 			setStatus: vi.fn(),
+			custom: vi.fn().mockResolvedValue(null),
+			setEditorText: vi.fn(),
 		},
 		hasUI: true,
 		cwd: "/test",
@@ -375,6 +405,123 @@ describe("index (extension entry point)", () => {
 			]) {
 				expect(typeof (factory as MockedFunction<any>).mock.calls[0][0]).toBe("function");
 			}
+		});
+	});
+
+	// 6. Shortcut registration
+	describe("shortcut registration", () => {
+		it("registers a Ctrl+Alt+P shortcut", async () => {
+			const { api } = createMockAPI();
+			extension(api);
+
+			expect(api.registerShortcut).toHaveBeenCalledWith(
+				"ctrl+alt+p",
+				expect.objectContaining({ description: expect.any(String) }),
+			);
+		});
+
+		it("shortcut handler returns early when hasUI is false", async () => {
+			const { api, shortcuts } = createMockAPI();
+			extension(api);
+			const handler = shortcuts[0].options.handler;
+			const ctx = createMockCtx({ hasUI: false });
+			await handler(ctx);
+			expect(ctx.ui.custom).not.toHaveBeenCalled();
+		});
+
+		it("shortcut handler returns early when manager is null", async () => {
+			const { api, shortcuts } = createMockAPI();
+			extension(api);
+			const handler = shortcuts[0].options.handler;
+			const ctx = createMockCtx();
+			await handler(ctx);
+			expect(ctx.ui.custom).not.toHaveBeenCalled();
+		});
+
+		it("notifies when no processes are running", async () => {
+			const { api, shortcuts, handlers } = createMockAPI();
+			extension(api);
+			const startHandler = handlers.get("session_start")!;
+			await startHandler({}, createMockCtx());
+			const instance = MockProcessManager.mock.results[0].value;
+			instance.list.mockReturnValue([]);
+
+			const handler = shortcuts[0].options.handler;
+			const ctx = createMockCtx();
+			await handler(ctx);
+			expect(ctx.ui.notify).toHaveBeenCalledWith(
+				"No processes running. Start one first.",
+				"info",
+			);
+		});
+
+		it("opens overlay with correct options", async () => {
+			const { api, shortcuts, handlers } = createMockAPI();
+			extension(api);
+			const startHandler = handlers.get("session_start")!;
+			await startHandler({}, createMockCtx());
+			const instance = MockProcessManager.mock.results[0].value;
+			instance.list.mockReturnValue([{ name: "dev-server", pid: 12345 }]);
+			instance.getLogs.mockReturnValue([]);
+
+			const handler = shortcuts[0].options.handler;
+			const ctx = createMockCtx();
+			await handler(ctx);
+
+			expect(ctx.ui.custom).toHaveBeenCalledWith(
+				expect.any(Function),
+				{
+					overlay: true,
+					overlayOptions: {
+						anchor: "center",
+						width: "66%",
+						maxHeight: "66%",
+					},
+				},
+			);
+		});
+
+		it("inserts formatted logs on result", async () => {
+			const { api, shortcuts, handlers } = createMockAPI();
+			extension(api);
+			const startHandler = handlers.get("session_start")!;
+			await startHandler({}, createMockCtx());
+			const instance = MockProcessManager.mock.results[0].value;
+			instance.list.mockReturnValue([{ name: "dev-server" }]);
+			instance.getLogs.mockReturnValue([]);
+
+			const selectedLogs = [{ timestamp: 1000, stream: "stdout", text: "hello" }];
+			const ctx = createMockCtx();
+			ctx.ui.custom = vi.fn().mockResolvedValue({ selectedLogs, processName: "dev-server" });
+
+			const handler = shortcuts[0].options.handler;
+			await handler(ctx);
+
+			expect(ctx.ui.setEditorText).toHaveBeenCalledWith(
+				"[+00:00:01.000] [stdout] hello",
+			);
+			expect(ctx.ui.notify).toHaveBeenCalledWith(
+				expect.stringContaining("1 log lines"),
+				"info",
+			);
+		});
+
+		it("does nothing when dialog is cancelled (null result)", async () => {
+			const { api, shortcuts, handlers } = createMockAPI();
+			extension(api);
+			const startHandler = handlers.get("session_start")!;
+			await startHandler({}, createMockCtx());
+			const instance = MockProcessManager.mock.results[0].value;
+			instance.list.mockReturnValue([{ name: "dev-server" }]);
+			instance.getLogs.mockReturnValue([]);
+
+			const ctx = createMockCtx();
+			ctx.ui.custom = vi.fn().mockResolvedValue(null);
+
+			const handler = shortcuts[0].options.handler;
+			await handler(ctx);
+
+			expect(ctx.ui.setEditorText).not.toHaveBeenCalled();
 		});
 	});
 });

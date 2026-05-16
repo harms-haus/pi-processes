@@ -8,6 +8,7 @@ Process management extension for the [pi Coding Agent](https://github.com/earend
 - **Output capture** — stdout and stderr are captured in a single in-memory log buffer (max 10 000 lines, FIFO eviction).
 - **SIGTERM → SIGKILL escalation** — graceful shutdown with automatic force-kill fallback.
 - **Log querying** — head, tail, or arbitrary line-range queries against captured logs.
+- **Process Logs Dialog** — interactive TUI overlay (`Ctrl+Alt+P`) to browse, select, and insert log lines from managed processes.
 - **Process lifecycle** — start, list, kill, restart, and inspect up to 50 concurrent managed processes.
 
 ## Installation
@@ -264,6 +265,27 @@ Max log delay: 1s
   ➜  Network: http://192.168.1.10:5173/
 ```
 
+## Keyboard Shortcuts
+
+| Shortcut | Description |
+|----------|-------------|
+| `Ctrl+Alt+P` | Open the Process Logs Dialog |
+
+The Process Logs Dialog is a TUI overlay that lets you visually browse, select, and insert log lines from managed processes.
+
+### Dialog Features
+
+- **Tab bar** — Switch between processes with `Tab` / `Shift+Tab`
+- **Scrollable log viewport** — Navigate with `↑` / `↓` arrows
+- **Multi-select** — Hold `Shift` + `↑` / `↓` to select multiple lines
+- **Insert to compose** — Press `Ctrl+Enter` to insert selected logs into the compose box
+- **Close** — Press `Esc` to close without inserting
+- **Timestamps** — Logs display elapsed time as `+HH:MM:SS.mmm`
+- **Diagnostics** — Footer shows process status (● running/exited), PID, uptime, log count
+- **Keybinding hints** — Available shortcuts shown at the bottom of the dialog
+
+The dialog requires a UI session (`hasUI`). In headless/RPC mode, the shortcut is a no-op.
+
 ## Use Cases
 
 ### Debug / Dev Servers
@@ -305,24 +327,35 @@ restart_process(name="api")               // restart after config change
 ```
 ┌─────────────────────────────────────────────────────┐
 │                     pi Extension API                 │
-│  (session_start / session_shutdown / registerTool)   │
-└──────────────┬──────────────────────────┬────────────┘
-               │                          │
-               ▼                          ▼
-┌──────────────────────┐    ┌──────────────────────────┐
-│    ProcessManager     │    │      Tool Definitions     │
-│                      │    │                           │
-│  Map<string,         │◄───│  start_process            │
-│    ProcessRecord>    │    │  list_processes            │
-│                      │    │  kill_process              │
-│  start() ────────────┼───►│  process_logs              │
-│  kill() ─────────────┼───►│  restart_process           │
-│  list()              │    └───────────────────────────┘
-│  getLogs()           │
-│  restart()           │    ┌──────────────────────────┐
-│  shutdown()          │    │    process-logs.ts         │
-│                      │    │  (queryLogs helper)        │
-└──────────────────────┘    └───────────────────────────┘
+│  (session_start / session_shutdown /                 │
+│   registerTool / registerShortcut)                   │
+└──────┬──────────────────────────┬───────────┬────────┘
+       │                          │           │
+       ▼                          ▼           │
+┌──────────────────────┐    ┌────────────┐    │
+│    ProcessManager     │    │   Tools     │    │  registerShortcut
+│                      │    │             │    │  (Ctrl+Alt+P)
+│  Map<string,         │◄───│  start_…    │    │
+│    ProcessRecord>    │    │  list_…     │    │
+│                      │    │  kill_…     │    │
+│  start() ────────────┼───►│  logs       │    │
+│  kill() ─────────────┼───►│  restart_…  │    │
+│  list()              │    └─────────────┘    │
+│  getLogs()           │                        │
+│  restart()           │    ┌──────────────────┐│
+│  shutdown()          │    │  process-logs.ts ││
+│                      │    │  (queryLogs)     ││
+└──────────┬───────────┘    └──────────────────┘│
+           │                                     │
+           │  getLogs()                          ▼
+           │                           ┌──────────────────┐
+           └──────────────────────────►│   LogDialog       │
+                                       │  (ui/log-dialog)  │
+                                       │                   │
+                                       │  ┌──────────────┐ │
+                                       │  │format-timestamp│ │
+                                       │  └──────────────┘ │
+                                       └──────────────────┘
 ```
 
 ### Process Lifecycle
@@ -370,34 +403,41 @@ npm run test:watch
 
 ```
 src/
-├── index.ts
-├── types.ts
-├── process-manager.ts
-├── process-logs.ts
-├── __tests__/
-│   ├── index.test.ts
-│   ├── process-manager.test.ts
-│   ├── process-logs.test.ts
-│   ├── helpers/
-│   │   ├── index.ts
-│   │   ├── mock-manager.ts
-│   │   ├── mock-theme.ts
-│   │   ├── execute-tool.ts
-│   │   └── make-logs.ts
-│   └── tools/
-│       ├── error-propagation.test.ts
-│       ├── start-process.test.ts
-│       ├── kill-process.test.ts
-│       ├── list-processes.test.ts
-│       ├── process-logs.test.ts
-│       └── restart-process.test.ts
-└── tools/
-    ├── start-process.ts
-    ├── kill-process.ts
-    ├── list-processes.ts
-    ├── process-logs.ts
-    ├── restart-process.ts
-    └── format-startup-result.ts
+├── index.ts              # Extension entry point
+├── types.ts              # Shared types and schemas
+├── process-manager.ts    # Core process management
+├── process-logs.ts       # Log query helper
+├── ui/                   # TUI components
+│   ├── index.ts          # Barrel export
+│   ├── format-timestamp.ts # Timestamp formatting
+│   └── log-dialog.ts     # Process logs dialog
+├── tools/                # Tool definitions
+│   ├── start-process.ts
+│   ├── list-processes.ts
+│   ├── kill-process.ts
+│   ├── process-logs.ts
+│   ├── restart-process.ts
+│   └── format-startup-result.ts
+└── __tests__/
+    ├── index.test.ts
+    ├── process-manager.test.ts
+    ├── process-logs.test.ts
+    ├── helpers/
+    │   ├── index.ts
+    │   ├── mock-manager.ts
+    │   ├── mock-theme.ts
+    │   ├── execute-tool.ts
+    │   └── make-logs.ts
+    ├── tools/
+    │   ├── error-propagation.test.ts
+    │   ├── start-process.test.ts
+    │   ├── kill-process.test.ts
+    │   ├── list-processes.test.ts
+    │   ├── process-logs.test.ts
+    │   └── restart-process.test.ts
+    └── ui/
+        ├── format-timestamp.test.ts
+        └── log-dialog.test.ts
 ```
 
 ### Testing
@@ -415,6 +455,10 @@ npm run test
 ```bash
 npm run lint
 ```
+
+## Dependencies
+
+The extension depends on [`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi-coding-agent) for the extension API and [`@earendil-works/pi-tui`](https://github.com/earendil-works/pi-tui) for TUI rendering components (`Key`, `matchesKey`, `truncateToWidth`, `Container`, `Text`, `Spacer`). Both are declared as peer dependencies.
 
 ## Known Limitations
 
