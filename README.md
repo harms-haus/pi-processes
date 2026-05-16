@@ -5,7 +5,7 @@ Process management extension for the [pi Coding Agent](https://github.com/earend
 ## Features
 
 - **Debounce-based startup detection** — waits for process output to quiet down before declaring startup complete, giving you the actual boot logs.
-- **Output capture** — stdout and stderr are captured with configurable limits (10 MB stdout sliding window, 1 MB stderr).
+- **Output capture** — stdout and stderr are captured in a single in-memory log buffer (max 10 000 lines, FIFO eviction).
 - **SIGTERM → SIGKILL escalation** — graceful shutdown with automatic force-kill fallback.
 - **Log querying** — head, tail, or arbitrary line-range queries against captured logs.
 - **Process lifecycle** — start, list, kill, restart, and inspect up to 50 concurrent managed processes.
@@ -330,7 +330,7 @@ restart_process(name="api")               // restart after config change
 1. **Session start** → `ProcessManager` is instantiated.
 2. **Tool call** (`start_process`) → `spawn()` creates a child process with piped stdio.
 3. **Startup debounce** → each stdout/stderr chunk resets a timer. When output goes quiet for `start_delay` seconds, the tool resolves with boot logs.
-4. **Log capture** → lines are appended to an in-memory ring buffer (max 10 000 entries). Stdout is capped at 10 MB (sliding window); stderr keeps the last 512 KB.
+4. **Log capture** → lines are appended to an in-memory log buffer (max 10 000 entries). Both stdout and stderr are captured identically; oldest lines are evicted via Array.shift() when the limit is reached.
 5. **Kill** → `SIGTERM` is sent. If the process hasn't exited within 5 seconds, `SIGKILL` is sent.
 6. **Session shutdown** → all managed processes are killed and the manager is cleared.
 
@@ -340,10 +340,7 @@ restart_process(name="api")               // restart after config change
 |------------------------|---------------|----------------------------------------------------|
 | `DEFAULT_START_DELAY`  | `5` seconds   | Default debounce silence period for startup.       |
 | `MAX_PROCESSES`        | `50`          | Maximum concurrent managed processes.              |
-| `MAX_LOG_ENTRIES`      | `10 000`      | Max log lines retained per process (ring buffer).  |
-| `MAX_STDOUT_BYTES`     | `10 MB`       | Max stdout buffer size (sliding window).           |
-| `MAX_STDERR_TEXT`      | `1 MB`        | Total stderr text cap.                             |
-| `STDERR_KEEP_BYTES`    | `512 KB`      | Bytes retained when stderr exceeds the cap.        |
+| `MAX_LOG_ENTRIES`      | `10 000`      | Max log lines retained per process (FIFO eviction).|
 | `SIGKILL_DELAY_MS`     | `5000` ms     | Grace period after SIGTERM before SIGKILL.         |
 
 ## Development
@@ -373,21 +370,39 @@ npm run test:watch
 
 ```
 src/
-├── index.ts              # Extension entry point (lifecycle + tool registration)
-├── types.ts              # Shared types, schemas, and constants
-├── process-manager.ts    # Core ProcessManager class
-├── process-logs.ts       # Log querying utilities (head/tail/range)
+├── index.ts
+├── types.ts
+├── process-manager.ts
+├── process-logs.ts
+├── __tests__/
+│   ├── index.test.ts
+│   ├── process-manager.test.ts
+│   ├── process-logs.test.ts
+│   ├── helpers/
+│   │   ├── index.ts
+│   │   ├── mock-manager.ts
+│   │   ├── mock-theme.ts
+│   │   ├── execute-tool.ts
+│   │   └── make-logs.ts
+│   └── tools/
+│       ├── error-propagation.test.ts
+│       ├── start-process.test.ts
+│       ├── kill-process.test.ts
+│       ├── list-processes.test.ts
+│       ├── process-logs.test.ts
+│       └── restart-process.test.ts
 └── tools/
-    ├── start-process.ts  # start_process tool definition
-    ├── list-processes.ts # list_processes tool definition
-    ├── kill-process.ts   # kill_process tool definition
-    ├── process-logs.ts   # process_logs tool definition
-    └── restart-process.ts# restart_process tool definition
+    ├── start-process.ts
+    ├── kill-process.ts
+    ├── list-processes.ts
+    ├── process-logs.ts
+    ├── restart-process.ts
+    └── format-startup-result.ts
 ```
 
 ### Testing
 
-Tests are written with [Vitest](https://vitest.dev/) and placed alongside source files as `*.test.ts`. The `ProcessManager` is designed with an `IProcessManager` interface for dependency injection, making tools straightforward to unit-test in isolation.
+Tests are written with [Vitest](https://vitest.dev/) and organized in `src/__tests__/` and `src/__tests__/tools/`.
 
 ```bash
 npm run test
@@ -400,6 +415,11 @@ npm run test
 ```bash
 npm run lint
 ```
+
+## Known Limitations
+
+- **Exited processes remain in memory**: Processes that exit naturally are retained in the internal Map (with their logs) until explicitly killed via `kill_process` or `shutdown`. This is intentional to allow log inspection after exit. The Map is capped at 50 processes.
+- **Log eviction uses Array.shift()**: The log ring buffer uses `Array.shift()` for eviction when MAX_LOG_ENTRIES is reached, which is O(n) per eviction. For extremely high-throughput processes producing thousands of log lines, this may cause GC pressure.
 
 ## License
 

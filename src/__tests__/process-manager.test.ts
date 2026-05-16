@@ -1,13 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
-import type { ChildProcess } from "node:child_process";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProcessManager } from "../process-manager.js";
 import {
 	DEFAULT_START_DELAY,
+	MAX_LOG_ENTRIES,
 	MAX_PROCESSES,
 	SIGKILL_DELAY_MS,
-	MAX_LOG_ENTRIES,
 } from "../types.js";
 
 // ── Mock child_process ──────────────────────────────────────────────────────
@@ -23,7 +23,10 @@ vi.mock("node:child_process", () => ({
 /** Create a mock ChildProcess with controllable streams */
 function createMockChildProcess(pid?: number): ChildProcess {
 	const cp = new EventEmitter() as unknown as ChildProcess;
-	Object.defineProperty(cp, "pid", { value: pid ?? Math.floor(Math.random() * 50000) + 10000, writable: false });
+	Object.defineProperty(cp, "pid", {
+		value: pid ?? Math.floor(Math.random() * 50000) + 10000,
+		writable: false,
+	});
 	(cp as any).stdout = new PassThrough();
 	(cp as any).stderr = new PassThrough();
 	(cp as any).stdin = { end: vi.fn() };
@@ -41,7 +44,10 @@ function createMockChildProcess(pid?: number): ChildProcess {
 /** Create a mock that ignores SIGTERM (requires SIGKILL) */
 function createStubbornMockChildProcess(pid?: number): ChildProcess {
 	const cp = new EventEmitter() as unknown as ChildProcess;
-	Object.defineProperty(cp, "pid", { value: pid ?? Math.floor(Math.random() * 50000) + 10000, writable: false });
+	Object.defineProperty(cp, "pid", {
+		value: pid ?? Math.floor(Math.random() * 50000) + 10000,
+		writable: false,
+	});
 	(cp as any).stdout = new PassThrough();
 	(cp as any).stderr = new PassThrough();
 	(cp as any).stdin = { end: vi.fn() };
@@ -268,6 +274,44 @@ describe("ProcessManager", () => {
 			expect((mockCp as any).kill).toHaveBeenCalledWith("SIGKILL");
 			expect(result.name).toBe("test");
 		});
+
+		it("kill() on already-exited process removes from map and returns result", async () => {
+			const { mockCp } = await startAndResolve(pm, "test", "sleep 10");
+
+			// Simulate the process exiting on its own
+			mockCp.emit("exit", 0, null);
+			expect(pm.has("test")).toBe(true); // Still in map until kill or cleanup
+
+			const result = await pm.kill("test");
+
+			expect(result.name).toBe("test");
+			expect(typeof result.pid).toBe("number");
+			expect(typeof result.totalRuntime).toBe("number");
+			expect(pm.has("test")).toBe(false);
+			expect(pm.size).toBe(0);
+		});
+
+		it("prevents concurrent kill calls on the same process", async () => {
+			// Use a stubborn mock so kill() promise stays pending
+			const mockCp = createStubbornMockChildProcess();
+			mockSpawn.mockReturnValue(mockCp);
+			const promise = pm.start("test", "sleep 10", 1);
+			vi.advanceTimersByTime(1000);
+			await promise;
+
+			// First kill() starts but doesn't resolve (SIGTERM ignored)
+			const killPromise = pm.kill("test");
+
+			// Second concurrent kill() should throw immediately
+			await expect(pm.kill("test")).rejects.toThrow(
+				/already being killed/,
+			);
+
+			// Clean up: let SIGKILL resolve the first kill
+			vi.advanceTimersByTime(SIGKILL_DELAY_MS);
+			const result = await killPromise;
+			expect(result.name).toBe("test");
+		});
 	});
 
 	// ── restart() ─────────────────────────────────────────────────────────
@@ -334,6 +378,12 @@ describe("ProcessManager", () => {
 			);
 		});
 
+		it("throws when no command provided and no previous command exists", async () => {
+			await expect(pm.restart("nonexistent-name")).rejects.toThrow(
+				"No command specified and no previous command found for \"nonexistent-name\"",
+			);
+		});
+
 		it("works on a process that is not yet running", async () => {
 			const cp = createMockChildProcess();
 			mockSpawn.mockReturnValue(cp);
@@ -345,6 +395,30 @@ describe("ProcessManager", () => {
 
 			expect(result.name).toBe("new-proc");
 			expect(pm.has("new-proc")).toBe(true);
+		});
+	});
+
+	// ── Non-zero exit code ────────────────────────────────────────────────
+
+	describe("non-zero exit code", () => {
+		it("stores exit code when process exits with code 1", async () => {
+			const mockCp = createMockChildProcess();
+			mockSpawn.mockReturnValue(mockCp);
+
+			const promise = pm.start("test", "exit 1", 1);
+			vi.advanceTimersByTime(1000);
+			await promise;
+
+			// Simulate non-zero exit
+			mockCp.emit("exit", 1, null);
+
+			const record = (pm as any).processes.get("test");
+			expect(record.exited).toBe(true);
+			expect(record.exitCode).toBe(1);
+
+			// Also reflected in list() as not running
+			const list = pm.list();
+			expect(list[0].running).toBe(false);
 		});
 	});
 
@@ -369,6 +443,35 @@ describe("ProcessManager", () => {
 		it("handles empty process list gracefully", async () => {
 			expect(pm.size).toBe(0);
 			await expect(pm.shutdown()).resolves.toBeUndefined();
+		});
+
+		it("clears processCountCallback during shutdown", async () => {
+			const callback = vi.fn();
+			pm.onProcessCountChange(callback);
+
+			await startAndResolve(pm, "test", "echo hi");
+
+			await pm.shutdown();
+
+			// After shutdown, the callback should no longer be called
+			// This verifies the callback was cleared (since we can't access private property)
+			const cp = createMockChildProcess();
+			mockSpawn.mockReturnValue(cp);
+			const promise = pm.start("test2", "echo hi again", 1);
+			vi.advanceTimersByTime(1000);
+			await promise;
+
+			// Callback should only be called 4 times:
+			// 1. Initial onProcessCountChange call (count=0)
+			// 2. After starting first process (count=1)
+			// 3. During kill in shutdown (count=0)
+			// 4. During shutdown emitProcessCount after clear (count=0)
+			// NOT called for second process start because callback was cleared
+			expect(callback).toHaveBeenCalledTimes(4);
+			expect(callback).toHaveBeenNthCalledWith(1, 0);
+			expect(callback).toHaveBeenNthCalledWith(2, 1);
+			expect(callback).toHaveBeenNthCalledWith(3, 0);
+			expect(callback).toHaveBeenNthCalledWith(4, 0);
 		});
 	});
 
@@ -566,9 +669,7 @@ describe("ProcessManager", () => {
 			expect(logs.length).toBe(MAX_LOG_ENTRIES);
 			// Should keep the latest entries (sliding window)
 			expect(logs[0].text).toBe(`Line 101`);
-			expect(logs[logs.length - 1].text).toBe(
-				`Line ${MAX_LOG_ENTRIES + 100}`,
-			);
+			expect(logs[logs.length - 1].text).toBe(`Line ${MAX_LOG_ENTRIES + 100}`);
 		});
 	});
 
@@ -587,6 +688,70 @@ describe("ProcessManager", () => {
 
 			const result = await promise;
 			expect(result.name).toBe("test");
+		});
+	});
+
+	// ── Spawn error event ──────────────────────────────────────────────────
+
+	describe("spawn error event", () => {
+		it("rejects startup promise if spawn emits error event", async () => {
+			const mockCp = createMockChildProcess();
+			mockSpawn.mockReturnValue(mockCp);
+
+			const promise = pm.start("test", "bad-command", 1);
+
+			// Simulate spawn error (e.g. ENOENT)
+			const error = new Error("spawn bad-command ENOENT");
+			mockCp.emit("error", error);
+
+			await expect(promise).rejects.toThrow(
+				/Failed to spawn process "test": spawn bad-command ENOENT/,
+			);
+
+			// Process should be removed from the manager
+			expect(pm.has("test")).toBe(false);
+			expect(pm.size).toBe(0);
+		});
+
+		it("clears debounce timer on spawn error", async () => {
+			const mockCp = createMockChildProcess();
+			mockSpawn.mockReturnValue(mockCp);
+
+			const promise = pm.start("test", "bad-command", 1);
+
+			// Emit error before debounce fires
+			mockCp.emit("error", new Error("spawn failed"));
+
+			await expect(promise).rejects.toThrow(/Failed to spawn process/);
+
+			// Advance timers — the debounce callback should NOT fire
+			// (it would try to resolve an already-rejected promise)
+			vi.advanceTimersByTime(2000);
+
+			// No additional errors or side effects
+			expect(pm.size).toBe(0);
+		});
+
+		it("emits process count change on spawn error", async () => {
+			const callback = vi.fn();
+			pm.onProcessCountChange(callback);
+			callback.mockClear();
+
+			const mockCp = createMockChildProcess();
+			mockSpawn.mockReturnValue(mockCp);
+
+			const promise = pm.start("test", "bad-command", 1);
+
+			// start() emits count=1 when process is added
+			expect(callback).toHaveBeenCalledWith(1);
+			callback.mockClear();
+
+			mockCp.emit("error", new Error("spawn failed"));
+
+			await expect(promise).rejects.toThrow(/Failed to spawn process/);
+
+			// Should emit count=0 after cleanup
+			expect(callback).toHaveBeenCalledWith(0);
 		});
 	});
 

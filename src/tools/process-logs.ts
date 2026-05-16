@@ -1,8 +1,8 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Container, Text } from "@earendil-works/pi-tui";
+import { type LogQueryOptions, queryLogs } from "../process-logs.js";
 import type { ProcessManager } from "../process-manager.js";
 import { ProcessLogsSchema } from "../types.js";
-import { queryLogs, type LogQueryOptions } from "../process-logs.js";
 
 export interface ProcessLogsResult {
 	logs: string;
@@ -23,40 +23,23 @@ export function createProcessLogsTool(
 			"Use process_logs with head=N to get first N lines.",
 			"Use process_logs with tail=N to get last N lines.",
 			"Use process_logs with start and end for a line range (1-indexed).",
-			"Use process_logs with grep=\"pattern\" to filter log lines by regex pattern.",
+			'Use process_logs with grep="pattern" to filter log lines by regex pattern.',
 			"Set grepLiteral=true to treat the grep pattern as a literal string.",
 			"Set grepIgnoreCase=true for case-insensitive grep matching.",
 			"grep can be combined with head/tail/start+end to slice filtered results.",
 		],
 		parameters: ProcessLogsSchema,
 		async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
-			// Validate mutually exclusive options
-			const hasHead = params.head !== undefined;
-			const hasTail = params.tail !== undefined;
-			const hasStart = params.start !== undefined;
-			const hasEnd = params.end !== undefined;
-
-			if (
-				(hasHead && hasTail) ||
-				(hasHead && hasStart) ||
-				(hasHead && hasEnd) ||
-				(hasTail && hasStart) ||
-				(hasTail && hasEnd)
-			) {
-				throw new Error(
-					"Invalid query: head, tail, and start/end are mutually exclusive",
-				);
-			}
-
 			const logs = getManager().getLogs(params.name);
 			const queryOptions: LogQueryOptions = {};
-			if (hasHead) queryOptions.head = params.head;
-			if (hasTail) queryOptions.tail = params.tail;
-			if (hasStart) queryOptions.start = params.start;
-			if (hasEnd) queryOptions.end = params.end;
+			if (params.head !== undefined) queryOptions.head = params.head;
+			if (params.tail !== undefined) queryOptions.tail = params.tail;
+			if (params.start !== undefined) queryOptions.start = params.start;
+			if (params.end !== undefined) queryOptions.end = params.end;
 			if (params.grep) queryOptions.grep = params.grep;
 			if (params.grepLiteral) queryOptions.grepLiteral = params.grepLiteral;
-			if (params.grepIgnoreCase) queryOptions.grepIgnoreCase = params.grepIgnoreCase;
+			if (params.grepIgnoreCase)
+				queryOptions.grepIgnoreCase = params.grepIgnoreCase;
 
 			const result = queryLogs(logs, queryOptions);
 			return {
@@ -84,7 +67,10 @@ export function createProcessLogsTool(
 							: "all";
 
 			const separator = grepPart && positionalMode ? " + " : "";
-			const modeStr = grepPart + separator + (positionalMode ? theme.fg("dim", positionalMode) : "");
+			const modeStr =
+				grepPart +
+				separator +
+				(positionalMode ? theme.fg("dim", positionalMode) : "");
 
 			return new Text(
 				theme.fg("toolTitle", theme.bold("process_logs ")) +

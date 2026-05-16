@@ -1,41 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
-import type { Theme } from "@earendil-works/pi-coding-agent";
-import type { KillResult } from "../../types.js";
+import { describe, expect, it } from "vitest";
 import { createKillProcessTool } from "../../tools/kill-process.js";
-
-// ── Mock ProcessManager ─────────────────────────────────────────────────────
-
-function createMockManager() {
-	return {
-		kill: vi.fn(),
-		start: vi.fn(),
-		list: vi.fn(),
-		getLogs: vi.fn(),
-		get: vi.fn(),
-		has: vi.fn(),
-		killAll: vi.fn(),
-		shutdown: vi.fn(),
-	};
-}
-
-// ── Mock Theme ──────────────────────────────────────────────────────────────
-
-function createMockTheme(): Theme {
-	return {
-		fg: vi.fn((color: string, text: string) => `<${color}>${text}</${color}>`),
-		bold: vi.fn((text: string) => `<bold>${text}</bold>`),
-	} as unknown as Theme;
-}
+import {
+	createMockManager,
+	createMockTheme,
+	defaultKillResult,
+	executeTool,
+} from "../helpers/index.js";
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 describe("createKillProcessTool", () => {
-	const mockKillResult: KillResult = {
-		name: "my-server",
-		pid: 12345,
-		totalRuntime: 5432,
-	};
-
 	it("has correct name and label", () => {
 		const manager = createMockManager();
 		const tool = createKillProcessTool(() => manager as any);
@@ -46,10 +20,9 @@ describe("createKillProcessTool", () => {
 
 	it("execute() calls manager.kill with correct name", async () => {
 		const manager = createMockManager();
-		manager.kill.mockResolvedValue(mockKillResult);
 		const tool = createKillProcessTool(() => manager as any);
 
-		await tool.execute("call-1", { name: "my-server" }, undefined, undefined, {} as any);
+		await executeTool(tool, "call-1", { name: "my-server" });
 
 		expect(manager.kill).toHaveBeenCalledWith("my-server");
 		expect(manager.kill).toHaveBeenCalledTimes(1);
@@ -57,16 +30,9 @@ describe("createKillProcessTool", () => {
 
 	it("execute() returns formatted text with runtime", async () => {
 		const manager = createMockManager();
-		manager.kill.mockResolvedValue(mockKillResult);
 		const tool = createKillProcessTool(() => manager as any);
 
-		const result = await tool.execute(
-			"call-1",
-			{ name: "my-server" },
-			undefined,
-			undefined,
-			{} as any,
-		);
+		const result = await executeTool(tool, "call-1", { name: "my-server" });
 
 		expect(result.content).toHaveLength(1);
 		expect(result.content[0].type).toBe("text");
@@ -79,22 +45,11 @@ describe("createKillProcessTool", () => {
 
 	it("execute() returns details with KillResult shape", async () => {
 		const manager = createMockManager();
-		manager.kill.mockResolvedValue(mockKillResult);
 		const tool = createKillProcessTool(() => manager as any);
 
-		const result = await tool.execute(
-			"call-1",
-			{ name: "my-server" },
-			undefined,
-			undefined,
-			{} as any,
-		);
+		const result = await executeTool(tool, "call-1", { name: "my-server" });
 
-		expect(result.details).toEqual({
-			name: "my-server",
-			pid: 12345,
-			totalRuntime: 5432,
-		});
+		expect(result.details).toEqual(defaultKillResult);
 	});
 
 	it("renderCall shows warning color", () => {
@@ -102,9 +57,12 @@ describe("createKillProcessTool", () => {
 		const tool = createKillProcessTool(() => manager as any);
 		const theme = createMockTheme();
 
-		const component = tool.renderCall!({ name: "my-server" }, theme, {} as any);
+		const component = tool.renderCall!({ name: "my-server" }, theme as any, {} as any);
 
-		expect(theme.fg).toHaveBeenCalledWith("warning", expect.stringContaining("kill_process"));
+		expect(theme.fg).toHaveBeenCalledWith(
+			"warning",
+			expect.stringContaining("kill_process"),
+		);
 		expect(theme.fg).toHaveBeenCalledWith("accent", "my-server");
 		expect(component).toBeDefined();
 	});
@@ -126,13 +84,22 @@ describe("createKillProcessTool", () => {
 		const component = tool.renderResult!(
 			toolResult,
 			{} as any,
-			theme,
+			theme as any,
 			{} as any,
 		);
 
-		expect(theme.fg).toHaveBeenCalledWith("error", expect.stringContaining("✗ my-server"));
-		expect(theme.fg).toHaveBeenCalledWith("dim", expect.stringContaining("PID 12345"));
-		expect(theme.fg).toHaveBeenCalledWith("dim", expect.stringContaining("5.4s"));
+		expect(theme.fg).toHaveBeenCalledWith(
+			"error",
+			expect.stringContaining("✗ my-server"),
+		);
+		expect(theme.fg).toHaveBeenCalledWith(
+			"dim",
+			expect.stringContaining("PID 12345"),
+		);
+		expect(theme.fg).toHaveBeenCalledWith(
+			"dim",
+			expect.stringContaining("5.4s"),
+		);
 		expect(component).toBeDefined();
 	});
 });

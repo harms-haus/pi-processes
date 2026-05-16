@@ -1,41 +1,25 @@
 import { describe, expect, it, vi } from "vitest";
-import type { LogEntry } from "../../types.js";
 import { createProcessLogsTool } from "../../tools/process-logs.js";
-import type { ProcessManager } from "../../process-manager.js";
+import type { LogEntry } from "../../types.js";
+import {
+	createMockManager,
+	createMockTheme,
+	executeTool,
+	makeLog,
+	makeLogs,
+} from "../helpers/index.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function makeLog(
-	text: string,
-	stream: "stdout" | "stderr" = "stdout",
-	offsetMs = 0,
-): LogEntry {
-	return { timestamp: offsetMs, text, stream };
-}
-
-function makeLogs(count: number): LogEntry[] {
-	return Array.from({ length: count }, (_, i) =>
-		makeLog(`Line ${i + 1}`, "stdout", i * 1000),
-	);
-}
-
 /** Create a mock ProcessManager whose getLogs returns the given entries */
-function mockManager(logs: LogEntry[]): ProcessManager {
-	return {
-		getLogs: vi.fn().mockReturnValue(logs),
-	} as unknown as ProcessManager;
-}
-
-/** Create a mock theme that concatenates the tag and text for easy assertions */
-function mockTheme() {
-	return {
-		fg: (color: string, text: string) => `<${color}>${text}</${color}>`,
-		bold: (text: string) => `<bold>${text}</bold>`,
-	};
+function mockManager(logs: LogEntry[]) {
+	return createMockManager({ getLogs: vi.fn().mockReturnValue(logs) }) as any;
 }
 
 /** Render a component to a single string for assertion */
-function renderToString(component: { render: (w: number) => string[] }): string {
+function renderToString(component: {
+	render: (w: number) => string[];
+}): string {
 	return component.render(200).join("\n");
 }
 
@@ -55,19 +39,16 @@ describe("createProcessLogsTool", () => {
 	// 2. execute() with head calls queryLogs correctly
 	it("execute with head returns first N lines", async () => {
 		const manager = mockManager(logs);
-		const tool = createProcessLogsTool(() => manager);
+		const tool = createProcessLogsTool(() => manager as any);
 
-		const result = await tool.execute(
-			"call-1",
-			{ name: "test-proc", head: 3 },
-			undefined,
-			undefined,
-			undefined as any,
-		);
+		const result = await executeTool(tool, "call-1", {
+			name: "test-proc",
+			head: 3,
+		});
 
 		expect(manager.getLogs).toHaveBeenCalledWith("test-proc");
-		expect(result.details.totalLines).toBe(10);
-		expect(result.details.returnedLines).toBe(3);
+		expect((result.details as any).totalLines).toBe(10);
+		expect((result.details as any).returnedLines).toBe(3);
 		expect(result.content[0].type).toBe("text");
 		const text1 = (result.content[0] as { type: "text"; text: string }).text;
 		expect(text1).toContain("[1]");
@@ -78,18 +59,15 @@ describe("createProcessLogsTool", () => {
 	// 3. execute() with tail calls queryLogs correctly
 	it("execute with tail returns last N lines", async () => {
 		const manager = mockManager(logs);
-		const tool = createProcessLogsTool(() => manager);
+		const tool = createProcessLogsTool(() => manager as any);
 
-		const result = await tool.execute(
-			"call-2",
-			{ name: "test-proc", tail: 3 },
-			undefined,
-			undefined,
-			undefined as any,
-		);
+		const result = await executeTool(tool, "call-2", {
+			name: "test-proc",
+			tail: 3,
+		});
 
-		expect(result.details.totalLines).toBe(10);
-		expect(result.details.returnedLines).toBe(3);
+		expect((result.details as any).totalLines).toBe(10);
+		expect((result.details as any).returnedLines).toBe(3);
 		const text2 = (result.content[0] as { type: "text"; text: string }).text;
 		expect(text2).toContain("[8]");
 		expect(text2).toContain("[10]");
@@ -99,18 +77,16 @@ describe("createProcessLogsTool", () => {
 	// 4. execute() with start+end calls queryLogs correctly
 	it("execute with start+end returns the correct range", async () => {
 		const manager = mockManager(logs);
-		const tool = createProcessLogsTool(() => manager);
+		const tool = createProcessLogsTool(() => manager as any);
 
-		const result = await tool.execute(
-			"call-3",
-			{ name: "test-proc", start: 2, end: 5 },
-			undefined,
-			undefined,
-			undefined as any,
-		);
+		const result = await executeTool(tool, "call-3", {
+			name: "test-proc",
+			start: 2,
+			end: 5,
+		});
 
-		expect(result.details.totalLines).toBe(10);
-		expect(result.details.returnedLines).toBe(4);
+		expect((result.details as any).totalLines).toBe(10);
+		expect((result.details as any).returnedLines).toBe(4);
 		const text3 = (result.content[0] as { type: "text"; text: string }).text;
 		expect(text3).toContain("[2]");
 		expect(text3).toContain("[5]");
@@ -120,38 +96,73 @@ describe("createProcessLogsTool", () => {
 
 	// 5. execute() throws on head+tail combination
 	it("execute throws on head+tail combination", async () => {
-		const tool = createProcessLogsTool(() => mockManager(logs));
+		const tool = createProcessLogsTool(() => mockManager(logs) as any);
 
 		await expect(
-			tool.execute(
-				"call-4",
-				{ name: "test-proc", head: 3, tail: 3 },
-				undefined,
-				undefined,
-				undefined as any,
-			),
-		).rejects.toThrow("mutually exclusive");
+			executeTool(tool, "call-4", {
+				name: "test-proc",
+				head: 3,
+				tail: 3,
+			}),
+		).rejects.toThrow("Cannot specify both head and tail");
 	});
 
 	// 6. execute() throws on head+start combination
 	it("execute throws on head+start combination", async () => {
-		const tool = createProcessLogsTool(() => mockManager(logs));
+		const tool = createProcessLogsTool(() => mockManager(logs) as any);
 
 		await expect(
-			tool.execute(
-				"call-5",
-				{ name: "test-proc", head: 3, start: 2 },
-				undefined,
-				undefined,
-				undefined as any,
-			),
-		).rejects.toThrow("mutually exclusive");
+			executeTool(tool, "call-5", {
+				name: "test-proc",
+				head: 3,
+				start: 2,
+			}),
+		).rejects.toThrow("Cannot specify both head and start");
 	});
 
-	// 7. renderCall shows query mode
+	// 7. execute() throws on head+end combination
+	it("execute throws on head+end combination", async () => {
+		const tool = createProcessLogsTool(() => mockManager(logs) as any);
+
+		await expect(
+			executeTool(tool, "call-head-end", {
+				name: "test-proc",
+				head: 3,
+				end: 5,
+			}),
+		).rejects.toThrow("Cannot specify both head and end");
+	});
+
+	// 8. execute() throws on tail+start combination
+	it("execute throws on tail+start combination", async () => {
+		const tool = createProcessLogsTool(() => mockManager(logs) as any);
+
+		await expect(
+			executeTool(tool, "call-tail-start", {
+				name: "test-proc",
+				tail: 3,
+				start: 2,
+			}),
+		).rejects.toThrow("Cannot specify both tail and start");
+	});
+
+	// 9. execute() throws on tail+end combination
+	it("execute throws on tail+end combination", async () => {
+		const tool = createProcessLogsTool(() => mockManager(logs) as any);
+
+		await expect(
+			executeTool(tool, "call-tail-end", {
+				name: "test-proc",
+				tail: 3,
+				end: 5,
+			}),
+		).rejects.toThrow("Cannot specify both tail and end");
+	});
+
+	// 10. renderCall shows query mode
 	it("renderCall shows query mode for head", () => {
-		const tool = createProcessLogsTool(() => mockManager([]));
-		const theme = mockTheme();
+		const tool = createProcessLogsTool(() => mockManager([]) as any);
+		const theme = createMockTheme();
 
 		const component = tool.renderCall!(
 			{ name: "myapp", head: 5 },
@@ -166,8 +177,8 @@ describe("createProcessLogsTool", () => {
 	});
 
 	it("renderCall shows tail mode", () => {
-		const tool = createProcessLogsTool(() => mockManager([]));
-		const theme = mockTheme();
+		const tool = createProcessLogsTool(() => mockManager([]) as any);
+		const theme = createMockTheme();
 
 		const component = tool.renderCall!(
 			{ name: "myapp", tail: 10 },
@@ -180,8 +191,8 @@ describe("createProcessLogsTool", () => {
 	});
 
 	it("renderCall shows start-end range mode", () => {
-		const tool = createProcessLogsTool(() => mockManager([]));
-		const theme = mockTheme();
+		const tool = createProcessLogsTool(() => mockManager([]) as any);
+		const theme = createMockTheme();
 
 		const component = tool.renderCall!(
 			{ name: "myapp", start: 5, end: 10 },
@@ -194,8 +205,8 @@ describe("createProcessLogsTool", () => {
 	});
 
 	it("renderCall shows all mode when no options", () => {
-		const tool = createProcessLogsTool(() => mockManager([]));
-		const theme = mockTheme();
+		const tool = createProcessLogsTool(() => mockManager([]) as any);
+		const theme = createMockTheme();
 
 		const component = tool.renderCall!(
 			{ name: "myapp" },
@@ -209,8 +220,8 @@ describe("createProcessLogsTool", () => {
 
 	// 8. renderResult shows line counts
 	it("renderResult shows line counts", () => {
-		const tool = createProcessLogsTool(() => mockManager([]));
-		const theme = mockTheme();
+		const tool = createProcessLogsTool(() => mockManager([]) as any);
+		const theme = createMockTheme();
 
 		const result = {
 			content: [{ type: "text" as const, text: "some log" }],
@@ -232,17 +243,15 @@ describe("createProcessLogsTool", () => {
 
 	// Additional: execute with empty logs returns "(no logs)"
 	it("execute returns (no logs) for empty logs", async () => {
-		const tool = createProcessLogsTool(() => mockManager([]));
+		const tool = createProcessLogsTool(() => mockManager([]) as any);
 
-		const result = await tool.execute(
-			"call-empty",
-			{ name: "test-proc" },
-			undefined,
-			undefined,
-			undefined as any,
+		const result = await executeTool(tool, "call-empty", {
+			name: "test-proc",
+		});
+
+		expect((result.content[0] as { type: "text"; text: string }).text).toBe(
+			"(no logs)",
 		);
-
-		expect((result.content[0] as { type: "text"; text: string }).text).toBe("(no logs)");
 	});
 
 	// ── Grep pass-through tests ─────────────────────────────────────────────
@@ -256,15 +265,12 @@ describe("createProcessLogsTool", () => {
 			makeLog("error: another failure"),
 		];
 		const manager = mockManager(grepLogs);
-		const tool = createProcessLogsTool(() => manager);
+		const tool = createProcessLogsTool(() => manager as any);
 
-		const result = await tool.execute(
-			"call-grep",
-			{ name: "test-proc", grep: "error" },
-			undefined,
-			undefined,
-			undefined as any,
-		);
+		const result = await executeTool(tool, "call-grep", {
+			name: "test-proc",
+			grep: "error",
+		});
 
 		const text = (result.content[0] as { type: "text"; text: string }).text;
 		expect(text).toContain("error: something failed");
@@ -275,20 +281,15 @@ describe("createProcessLogsTool", () => {
 
 	// 2. execute passes grepLiteral to queryLogs
 	it("execute passes grepLiteral to queryLogs", async () => {
-		const grepLogs: LogEntry[] = [
-			makeLog("foo.bar"),
-			makeLog("fooXbar"),
-		];
+		const grepLogs: LogEntry[] = [makeLog("foo.bar"), makeLog("fooXbar")];
 		const manager = mockManager(grepLogs);
-		const tool = createProcessLogsTool(() => manager);
+		const tool = createProcessLogsTool(() => manager as any);
 
-		const result = await tool.execute(
-			"call-grep-literal",
-			{ name: "test-proc", grep: "foo.bar", grepLiteral: true },
-			undefined,
-			undefined,
-			undefined as any,
-		);
+		const result = await executeTool(tool, "call-grep-literal", {
+			name: "test-proc",
+			grep: "foo.bar",
+			grepLiteral: true,
+		});
 
 		const text = (result.content[0] as { type: "text"; text: string }).text;
 		expect(text).toContain("foo.bar");
@@ -303,15 +304,13 @@ describe("createProcessLogsTool", () => {
 			makeLog("info: ok"),
 		];
 		const manager = mockManager(grepLogs);
-		const tool = createProcessLogsTool(() => manager);
+		const tool = createProcessLogsTool(() => manager as any);
 
-		const result = await tool.execute(
-			"call-grep-ignore-case",
-			{ name: "test-proc", grep: "ERROR", grepIgnoreCase: true },
-			undefined,
-			undefined,
-			undefined as any,
-		);
+		const result = await executeTool(tool, "call-grep-ignore-case", {
+			name: "test-proc",
+			grep: "ERROR",
+			grepIgnoreCase: true,
+		});
 
 		const text = (result.content[0] as { type: "text"; text: string }).text;
 		expect(text).toContain("ERROR: critical");
@@ -321,8 +320,8 @@ describe("createProcessLogsTool", () => {
 
 	// 4. renderCall shows grep pattern
 	it("renderCall shows grep pattern", () => {
-		const tool = createProcessLogsTool(() => mockManager([]));
-		const theme = mockTheme();
+		const tool = createProcessLogsTool(() => mockManager([]) as any);
+		const theme = createMockTheme();
 
 		const component = tool.renderCall!(
 			{ name: "myapp", grep: "error" },
@@ -331,13 +330,13 @@ describe("createProcessLogsTool", () => {
 		);
 
 		const str = renderToString(component);
-		expect(str).toContain("grep(\"error\")");
+		expect(str).toContain('grep("error")');
 	});
 
 	// 5. renderCall shows grep + head
 	it("renderCall shows grep + head", () => {
-		const tool = createProcessLogsTool(() => mockManager([]));
-		const theme = mockTheme();
+		const tool = createProcessLogsTool(() => mockManager([]) as any);
+		const theme = createMockTheme();
 
 		const component = tool.renderCall!(
 			{ name: "myapp", grep: "error", head: 5 },
@@ -346,14 +345,14 @@ describe("createProcessLogsTool", () => {
 		);
 
 		const str = renderToString(component);
-		expect(str).toContain("grep(\"error\")");
+		expect(str).toContain('grep("error")');
 		expect(str).toContain("head(5)");
 	});
 
 	// 6. renderCall shows grep + tail
 	it("renderCall shows grep + tail", () => {
-		const tool = createProcessLogsTool(() => mockManager([]));
-		const theme = mockTheme();
+		const tool = createProcessLogsTool(() => mockManager([]) as any);
+		const theme = createMockTheme();
 
 		const component = tool.renderCall!(
 			{ name: "myapp", grep: "warn", tail: 10 },
@@ -362,7 +361,7 @@ describe("createProcessLogsTool", () => {
 		);
 
 		const str = renderToString(component);
-		expect(str).toContain("grep(\"warn\")");
+		expect(str).toContain('grep("warn")');
 		expect(str).toContain("tail(10)");
 	});
 });

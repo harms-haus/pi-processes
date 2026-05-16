@@ -1,25 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
-import type { ProcessInfo } from "../../types.js";
+import { describe, expect, it } from "vitest";
 import { createListProcessesTool } from "../../tools/list-processes.js";
-
-// ── Mock ProcessManager ─────────────────────────────────────────────────────
-
-function createMockManager(processes: ProcessInfo[] = []) {
-	return {
-		list: vi.fn<() => ProcessInfo[]>().mockReturnValue(processes),
-	};
-}
-
-type MockManager = ReturnType<typeof createMockManager>;
-
-// ── Mock theme ──────────────────────────────────────────────────────────────
-
-function createMockTheme() {
-	return {
-		fg: (_slot: string, text: string) => text,
-		bold: (text: string) => `**${text}**`,
-	};
-}
+import type { ProcessInfo } from "../../types.js";
+import { createMockManager, createMockTheme, executeTool } from "../helpers/index.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -38,22 +20,11 @@ function sampleProcess(overrides: Partial<ProcessInfo> = {}): ProcessInfo {
 	};
 }
 
-/** Call execute() with minimal stubs */
-async function executeTool(tool: ReturnType<typeof createListProcessesTool>) {
-	return tool.execute(
-		"call-1",
-		{},
-		undefined,
-		undefined,
-		{} as any,
-	);
-}
-
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 describe("createListProcessesTool", () => {
 	it("has correct name and label", () => {
-		const manager = createMockManager() as unknown as MockManager;
+		const manager = createMockManager();
 		const tool = createListProcessesTool(() => manager as any);
 		expect(tool.name).toBe("list_processes");
 		expect(tool.label).toBe("List Processes");
@@ -61,9 +32,9 @@ describe("createListProcessesTool", () => {
 
 	describe("execute()", () => {
 		it('returns "No active processes." when empty', async () => {
-			const manager = createMockManager([]);
+			const manager = createMockManager();
 			const tool = createListProcessesTool(() => manager as any);
-			const result = await executeTool(tool);
+			const result = await executeTool(tool, "call-1", {});
 
 			expect(result.content).toHaveLength(1);
 			expect(result.content[0]).toMatchObject({
@@ -74,12 +45,26 @@ describe("createListProcessesTool", () => {
 
 		it("returns formatted list when processes exist", async () => {
 			const processes = [
-				sampleProcess({ name: "web", pid: 1001, command: "npm run dev", uptimeSec: 60, logLines: 42, startupComplete: true }),
-				sampleProcess({ name: "db", pid: 1002, command: "postgres", uptimeSec: 120, logLines: 10, startupComplete: false }),
+				sampleProcess({
+					name: "web",
+					pid: 1001,
+					command: "npm run dev",
+					uptimeSec: 60,
+					logLines: 42,
+					startupComplete: true,
+				}),
+				sampleProcess({
+					name: "db",
+					pid: 1002,
+					command: "postgres",
+					uptimeSec: 120,
+					logLines: 10,
+					startupComplete: false,
+				}),
 			];
-			const manager = createMockManager(processes);
+			const manager = createMockManager({ list: () => processes });
 			const tool = createListProcessesTool(() => manager as any);
-			const result = await executeTool(tool);
+			const result = await executeTool(tool, "call-1", {});
 
 			const text = (result.content[0] as { type: "text"; text: string }).text;
 			expect(text).toContain("web (PID 1001)");
@@ -97,9 +82,9 @@ describe("createListProcessesTool", () => {
 				sampleProcess({ name: "web" }),
 				sampleProcess({ name: "db" }),
 			];
-			const manager = createMockManager(processes);
+			const manager = createMockManager({ list: () => processes });
 			const tool = createListProcessesTool(() => manager as any);
-			const result = await executeTool(tool);
+			const result = await executeTool(tool, "call-1", {});
 
 			expect(result.details).toEqual({
 				processes,
@@ -110,7 +95,7 @@ describe("createListProcessesTool", () => {
 
 	describe("renderResult()", () => {
 		it("shows process count", () => {
-			const manager = createMockManager() as unknown as MockManager;
+			const manager = createMockManager();
 			const tool = createListProcessesTool(() => manager as any);
 			const theme = createMockTheme();
 
@@ -133,7 +118,7 @@ describe("createListProcessesTool", () => {
 		});
 
 		it("shows only title when no processes", () => {
-			const manager = createMockManager() as unknown as MockManager;
+			const manager = createMockManager();
 			const tool = createListProcessesTool(() => manager as any);
 			const theme = createMockTheme();
 

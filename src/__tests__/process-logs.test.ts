@@ -1,23 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { LogEntry } from "../types.js";
 import { queryLogs } from "../process-logs.js";
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-function makeLog(
-	text: string,
-	stream: "stdout" | "stderr" = "stdout",
-	offsetMs = 0,
-): LogEntry {
-	return { timestamp: offsetMs, text, stream };
-}
-
-/** Build an array of N sequential log entries: "Line 1", "Line 2", … */
-function makeLogs(count: number): LogEntry[] {
-	return Array.from({ length: count }, (_, i) =>
-		makeLog(`Line ${i + 1}`, "stdout", i * 1000),
-	);
-}
+import { makeLog, makeLogs } from "./helpers/index.js";
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
@@ -230,10 +213,7 @@ describe("queryLogs", () => {
 	});
 
 	it("grepLiteral escapes regex metacharacters", () => {
-		const logs = [
-			makeLog("error.code"),
-			makeLog("errorXcode"),
-		];
+		const logs = [makeLog("error.code"), makeLog("errorXcode")];
 		const result = queryLogs(logs, { grep: "error.code", grepLiteral: true });
 
 		expect(result.returnedLines).toBe(1);
@@ -343,5 +323,36 @@ describe("queryLogs", () => {
 		expect(result.text).toContain("ERROR");
 		expect(result.text).toContain("erroR");
 		expect(result.text).not.toContain("failure");
+	});
+
+	it("tail larger than total lines returns all lines", () => {
+		const logs = makeLogs(5);
+		const result = queryLogs(logs, { tail: 100 });
+
+		expect(result.totalLines).toBe(5);
+		expect(result.returnedLines).toBe(5);
+		expect(result.text).toContain("[1]");
+		expect(result.text).toContain("[5]");
+		expect(result.text).toContain("Line 1");
+		expect(result.text).toContain("Line 5");
+	});
+
+	it("start === end returns exactly 1 line", () => {
+		const logs = makeLogs(10);
+		const result = queryLogs(logs, { start: 3, end: 3 });
+
+		expect(result.totalLines).toBe(10);
+		expect(result.returnedLines).toBe(1);
+		expect(result.text).toContain("[3]");
+		expect(result.text).toContain("Line 3");
+		expect(result.text).not.toContain("[2]");
+		expect(result.text).not.toContain("[4]");
+	});
+
+	it("throws a friendly error for invalid regex patterns", () => {
+		const logs = [makeLog("hello world")];
+		expect(() => queryLogs(logs, { grep: "[invalid" })).toThrow(
+			'Invalid regex pattern: "[invalid"',
+		);
 	});
 });

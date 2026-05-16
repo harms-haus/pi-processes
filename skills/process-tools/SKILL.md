@@ -25,7 +25,7 @@ Tools for starting, monitoring, and debugging long-running processes like dev se
 
 Use when the user asks to start a server, watcher, or any long-running command that should persist across tool calls.
 
-**Parameters:** `name` (unique identifier), `command` (shell command), `start_delay` (optional, seconds)
+**Parameters:** `name` (unique identifier, alphanumeric/hyphen/underscore only, max 64 chars), `command` (shell command), `start_delay` (optional, 1-120 seconds, default 5)
 
 ```
 start_process(name="dev-server", command="npm run dev")
@@ -102,7 +102,7 @@ restart_process(name="dev-server")
 restart_process(name="dev-server", command="npm run dev -- --port 3001")
 ```
 
-If `command` is omitted, it reuses the original command.
+If `command` is omitted, it reuses the original command. The `start_delay` parameter is also optional (1-120 seconds, default 5).
 
 ### `kill_process`
 

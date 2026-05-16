@@ -88,9 +88,14 @@ export function queryLogs(
 	let filteredLogs: Array<{ entry: LogEntry; originalIndex: number }>;
 	if (grep) {
 		const flags = grepIgnoreCase ? "i" : "";
-		const regex = grepLiteral
-			? new RegExp(escapeRegex(grep), flags)
-			: new RegExp(grep, flags);
+		let regex: RegExp;
+		try {
+			regex = grepLiteral
+				? new RegExp(escapeRegex(grep), flags)
+				: new RegExp(grep, flags);
+		} catch {
+			throw new Error(`Invalid regex pattern: "${grep}"`);
+		}
 		filteredLogs = [];
 		for (let i = 0; i < logs.length; i++) {
 			if (regex.test(logs[i].text)) {
@@ -98,7 +103,10 @@ export function queryLogs(
 			}
 		}
 	} else {
-		filteredLogs = logs.map((entry, originalIndex) => ({ entry, originalIndex }));
+		filteredLogs = logs.map((entry, originalIndex) => ({
+			entry,
+			originalIndex,
+		}));
 	}
 
 	const filteredCount = filteredLogs.length;
