@@ -1,8 +1,8 @@
-import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
+import { ListProcessesSchema } from "../types.js";
 import type { ProcessManager } from "../process-manager.js";
 import type { ProcessInfo } from "../types.js";
-import { ListProcessesSchema } from "../types.js";
+import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 
 export interface ListProcessesResult {
 	processes: ProcessInfo[];

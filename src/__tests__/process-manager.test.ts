@@ -816,7 +816,7 @@ describe("ProcessManager", () => {
 
 			const promise = pm.restart("test", undefined, 1);
 			// Flush microtasks so kill resolves
-			for (let i = 0; i < 10; i++) await Promise.resolve();
+			for (let i = 0; i < 10; i++) {await Promise.resolve();}
 			vi.advanceTimersByTime(1000);
 			await promise;
 

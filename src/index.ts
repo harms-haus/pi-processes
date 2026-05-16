@@ -9,16 +9,16 @@
  *   restart_process   — Restart a managed process
  */
 
-import type {
-	ExtensionAPI,
-	ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
 import { ProcessManager } from "./process-manager.js";
 import { createKillProcessTool } from "./tools/kill-process.js";
 import { createListProcessesTool } from "./tools/list-processes.js";
 import { createProcessLogsTool } from "./tools/process-logs.js";
 import { createRestartProcessTool } from "./tools/restart-process.js";
 import { createStartProcessTool } from "./tools/start-process.js";
+import type {
+	ExtensionAPI,
+	ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 
 export default function (pi: ExtensionAPI) {
 	let manager: ProcessManager | null = null;

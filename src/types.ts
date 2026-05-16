@@ -2,8 +2,8 @@
  * Shared types for the pi-processes extension
  */
 
-import type { ChildProcess } from "node:child_process";
 import { Type } from "typebox";
+import type { ChildProcess } from "node:child_process";
 
 // ── Core Types ──────────────────────────────────────────────────────────────
 

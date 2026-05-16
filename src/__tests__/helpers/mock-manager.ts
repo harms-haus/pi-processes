@@ -64,15 +64,15 @@ export function createMockManager(
 	const shutdown = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
 	const onProcessCountChange = vi.fn<(callback: (count: number) => void) => void>();
 
-	if (overrides?.start) start.mockImplementation(overrides.start as any);
-	if (overrides?.kill) kill.mockImplementation(overrides.kill as any);
-	if (overrides?.restart) restart.mockImplementation(overrides.restart as any);
-	if (overrides?.list) list.mockImplementation(overrides.list as any);
-	if (overrides?.getLogs) getLogs.mockImplementation(overrides.getLogs as any);
-	if (overrides?.has) has.mockImplementation(overrides.has as any);
-	if (overrides?.killAll) killAll.mockImplementation(overrides.killAll as any);
-	if (overrides?.shutdown) shutdown.mockImplementation(overrides.shutdown as any);
-	if (overrides?.onProcessCountChange) onProcessCountChange.mockImplementation(overrides.onProcessCountChange);
+	if (overrides?.start) {start.mockImplementation(overrides.start as any);}
+	if (overrides?.kill) {kill.mockImplementation(overrides.kill as any);}
+	if (overrides?.restart) {restart.mockImplementation(overrides.restart as any);}
+	if (overrides?.list) {list.mockImplementation(overrides.list as any);}
+	if (overrides?.getLogs) {getLogs.mockImplementation(overrides.getLogs as any);}
+	if (overrides?.has) {has.mockImplementation(overrides.has as any);}
+	if (overrides?.killAll) {killAll.mockImplementation(overrides.killAll as any);}
+	if (overrides?.shutdown) {shutdown.mockImplementation(overrides.shutdown as any);}
+	if (overrides?.onProcessCountChange) {onProcessCountChange.mockImplementation(overrides.onProcessCountChange);}
 
 	return {
 		start,

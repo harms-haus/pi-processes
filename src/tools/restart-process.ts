@@ -1,9 +1,9 @@
-import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Container, Text } from "@earendil-works/pi-tui";
-import type { ProcessManager } from "../process-manager.js";
-import type { StartupResult } from "../types.js";
 import { DEFAULT_START_DELAY, RestartProcessSchema } from "../types.js";
 import { formatStartupResult } from "./format-startup-result.js";
+import type { ProcessManager } from "../process-manager.js";
+import type { StartupResult } from "../types.js";
+import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 
 export function createRestartProcessTool(
 	getManager: () => ProcessManager,

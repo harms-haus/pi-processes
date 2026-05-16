@@ -1,8 +1,8 @@
-import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Container, Text } from "@earendil-works/pi-tui";
 import { type LogQueryOptions, queryLogs } from "../process-logs.js";
-import type { ProcessManager } from "../process-manager.js";
 import { ProcessLogsSchema } from "../types.js";
+import type { ProcessManager } from "../process-manager.js";
+import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 
 export interface ProcessLogsResult {
 	logs: string;
@@ -32,14 +32,14 @@ export function createProcessLogsTool(
 		async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
 			const logs = getManager().getLogs(params.name);
 			const queryOptions: LogQueryOptions = {};
-			if (params.head !== undefined) queryOptions.head = params.head;
-			if (params.tail !== undefined) queryOptions.tail = params.tail;
-			if (params.start !== undefined) queryOptions.start = params.start;
-			if (params.end !== undefined) queryOptions.end = params.end;
-			if (params.grep) queryOptions.grep = params.grep;
-			if (params.grepLiteral) queryOptions.grepLiteral = params.grepLiteral;
+			if (params.head !== undefined) {queryOptions.head = params.head;}
+			if (params.tail !== undefined) {queryOptions.tail = params.tail;}
+			if (params.start !== undefined) {queryOptions.start = params.start;}
+			if (params.end !== undefined) {queryOptions.end = params.end;}
+			if (params.grep) {queryOptions.grep = params.grep;}
+			if (params.grepLiteral) {queryOptions.grepLiteral = params.grepLiteral;}
 			if (params.grepIgnoreCase)
-				queryOptions.grepIgnoreCase = params.grepIgnoreCase;
+				{queryOptions.grepIgnoreCase = params.grepIgnoreCase;}
 
 			const result = queryLogs(logs, queryOptions);
 			return {

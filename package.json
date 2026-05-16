@@ -1,27 +1,42 @@
 {
-  "name": "pi-processes",
-  "version": "0.1.0",
-  "description": "Process definitions and utilities for the pi framework",
-  "main": "./src/index.ts",
-  "private": true,
-  "license": "MIT",
-  "type": "module",
-  "keywords": ["pi-package", "pi-extension", "processes"],
-  "pi": {
-    "extensions": ["./src/index.ts"]
-  },
-  "scripts": {
-    "lint": "biome check src/",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "typebox": "^1.1.38"
-  },
-  "devDependencies": {
-    "@types/node": "^22.0.0",
-    "vitest": "^3.0.0",
-    "typescript": "^6.0.3"
-  }
+	"name": "pi-processes",
+	"version": "0.1.0",
+	"description": "Process definitions and utilities for the pi framework",
+	"main": "./src/index.ts",
+	"private": true,
+	"license": "MIT",
+	"type": "module",
+	"keywords": ["pi-package", "pi-extension", "processes"],
+	"pi": {
+		"extensions": ["./src/index.ts"]
+	},
+	"scripts": {
+		"lint": "eslint src/",
+		"lint:fix": "eslint --fix src/",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"typebox": "^1.1.38"
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-coding-agent": "^0.74.0",
+		"@earendil-works/pi-tui": "^0.74.0"
+	},
+	"devDependencies": {
+		"@eslint/compat": "^2.1.0",
+		"@eslint/eslintrc": "^3.3.5",
+		"@eslint/js": "^10.0.1",
+		"@types/node": "^22.0.0",
+		"eslint": "^10.4.0",
+		"eslint-import-resolver-typescript": "^4.4.4",
+		"eslint-plugin-import-x": "^4.16.2",
+		"eslint-plugin-unicorn": "^64.0.0",
+		"@earendil-works/pi-coding-agent": "^0.74.0",
+		"@earendil-works/pi-tui": "^0.74.0",
+		"typescript": "^6.0.3",
+		"typescript-eslint": "^8.59.3",
+		"vitest": "^3.0.0"
+	}
 }

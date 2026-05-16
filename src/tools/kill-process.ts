@@ -1,8 +1,8 @@
-import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Container, Text } from "@earendil-works/pi-tui";
+import { KillProcessSchema } from "../types.js";
 import type { ProcessManager } from "../process-manager.js";
 import type { KillResult } from "../types.js";
-import { KillProcessSchema } from "../types.js";
+import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 
 export function createKillProcessTool(
 	getManager: () => ProcessManager,

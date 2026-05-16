@@ -1,16 +1,16 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import {
+	DEFAULT_START_DELAY,
+	MAX_LOG_ENTRIES,
+	MAX_PROCESSES,
+	SIGKILL_DELAY_MS,
+} from "./types.js";
 import type {
 	KillResult,
 	LogEntry,
 	ProcessInfo,
 	ProcessRecord,
 	StartupResult,
-} from "./types.js";
-import {
-	DEFAULT_START_DELAY,
-	MAX_LOG_ENTRIES,
-	MAX_PROCESSES,
-	SIGKILL_DELAY_MS,
 } from "./types.js";
 
 /**
@@ -51,7 +51,7 @@ export class ProcessManager {
 	/** List all active processes */
 	list(): ProcessInfo[] {
 		const now = Date.now();
-		return Array.from(this.processes.values()).map((record) => ({
+		return [...this.processes.values()].map((record) => ({
 			name: record.name,
 			pid: record.pid,
 			command: record.command,
@@ -121,7 +121,7 @@ export class ProcessManager {
 			env: { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "" },
 		});
 
-		if (childProcess.pid == null) {
+		if (childProcess.pid === null || childProcess.pid === undefined) {
 			throw new Error(
 				`Failed to spawn process "${name}": child process has no pid`,
 			);
@@ -262,7 +262,9 @@ export class ProcessManager {
 
 			// If startup hasn't completed yet, resolve now
 			if (!record.startupComplete && record.startupResolve) {
-				clearTimeout(record.debounceTimer!);
+				if (record.debounceTimer !== null) {
+					clearTimeout(record.debounceTimer);
+				}
 				record.startupComplete = true;
 				record.startupResolve({
 					name: record.name,
@@ -375,7 +377,7 @@ export class ProcessManager {
 
 	/** Clean up all managed processes (call on session shutdown) */
 	async shutdown(): Promise<void> {
-		const names = Array.from(this.processes.keys());
+		const names = [...this.processes.keys()];
 		await Promise.allSettled(names.map((name) => this.kill(name)));
 		this.processes.clear();
 		this.emitProcessCount();
