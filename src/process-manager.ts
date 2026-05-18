@@ -1,6 +1,6 @@
-import { spawn, type ChildProcess } from 'node:child_process';
-import { DEFAULT_START_DELAY, MAX_LOG_ENTRIES, MAX_PROCESSES, SIGKILL_DELAY_MS } from './types.js';
-import type { KillResult, LogEntry, ProcessInfo, ProcessRecord, StartupResult } from './types.js';
+import { spawn, type ChildProcess } from "node:child_process";
+import { DEFAULT_START_DELAY, MAX_LOG_ENTRIES, MAX_PROCESSES, SIGKILL_DELAY_MS } from "./types.js";
+import type { KillResult, LogEntry, ProcessInfo, ProcessRecord, StartupResult } from "./types.js";
 
 /**
  * Manages spawned child processes with debounce-based startup detection,
@@ -79,10 +79,10 @@ export class ProcessManager {
     this.emitProcessCount();
 
     const addLog = this.createAddLog(record);
-    const resetDebounce = () => this.resetDebounce(record, startDelay);
+    const resetDebounce = () => { this.resetDebounce(record, startDelay); };
 
-    this.setupStreamHandler(childProcess, 'stdout', addLog, resetDebounce);
-    this.setupStreamHandler(childProcess, 'stderr', addLog, resetDebounce);
+    this.setupStreamHandler(childProcess, "stdout", addLog, resetDebounce);
+    this.setupStreamHandler(childProcess, "stderr", addLog, resetDebounce);
     this.setupErrorHandler(record, childProcess);
     this.setupExitHandler(record, childProcess);
 
@@ -106,12 +106,12 @@ export class ProcessManager {
   ): { childProcess: ChildProcess; record: ProcessRecord } {
     const childProcess = spawn(command, [], {
       shell: true,
-      stdio: ['pipe', 'pipe', 'pipe'],
+      stdio: ["pipe", "pipe", "pipe"],
       // Forward full parent environment to child processes
       env: { ...(process.env as Record<string, string>) },
     });
 
-    if (childProcess.pid === null || childProcess.pid === undefined) {
+    if (childProcess.pid === undefined) {
       throw new Error(`Failed to spawn process "${name}": child process has no pid`);
     }
 
@@ -137,8 +137,8 @@ export class ProcessManager {
   }
 
   /** Create the addLog helper closure that tracks inter-line delay and appends entries */
-  private createAddLog(record: ProcessRecord): (stream: 'stdout' | 'stderr', text: string) => void {
-    return (stream: 'stdout' | 'stderr', text: string) => {
+  private createAddLog(record: ProcessRecord): (stream: "stdout" | "stderr", text: string) => void {
+    return (stream: "stdout" | "stderr", text: string) => {
       const now = Date.now();
       const delay = now - record.lastLogTime;
       if (delay > record.maxDelay) {
@@ -161,12 +161,12 @@ export class ProcessManager {
   /** Parse a data chunk into individual non-empty lines and add them as log entries */
   private parseChunk(
     chunk: Buffer,
-    stream: 'stdout' | 'stderr',
-    addLog: (stream: 'stdout' | 'stderr', text: string) => void,
+    stream: "stdout" | "stderr",
+    addLog: (stream: "stdout" | "stderr", text: string) => void,
   ): void {
-    const lines = chunk.toString().split('\n');
+    const lines = chunk.toString().split("\n");
     for (const line of lines) {
-      if (line !== '') {
+      if (line !== "") {
         addLog(stream, line);
       }
     }
@@ -189,11 +189,11 @@ export class ProcessManager {
   /** Attach stdout/stderr data handler */
   private setupStreamHandler(
     childProcess: ChildProcess,
-    stream: 'stdout' | 'stderr',
-    addLog: (stream: 'stdout' | 'stderr', text: string) => void,
+    stream: "stdout" | "stderr",
+    addLog: (stream: "stdout" | "stderr", text: string) => void,
     resetDebounce: () => void,
   ): void {
-    childProcess[stream]?.on('data', (chunk: Buffer) => {
+    childProcess[stream]?.on("data", (chunk: Buffer) => {
       this.parseChunk(chunk, stream, addLog);
       resetDebounce();
     });
@@ -201,7 +201,7 @@ export class ProcessManager {
 
   /** Attach error handler — fires if spawn itself fails (ENOENT, EACCES, etc.) */
   private setupErrorHandler(record: ProcessRecord, childProcess: ChildProcess): void {
-    childProcess.on('error', (err) => {
+    childProcess.on("error", (err) => {
       if (record.debounceTimer !== null) {
         clearTimeout(record.debounceTimer);
         record.debounceTimer = null;
@@ -217,7 +217,7 @@ export class ProcessManager {
 
   /** Attach exit handler — resolves startup if it hasn't completed yet */
   private setupExitHandler(record: ProcessRecord, childProcess: ChildProcess): void {
-    childProcess.on('exit', (_code) => {
+    childProcess.on("exit", (_code) => {
       record.exited = true;
 
       // If startup hasn't completed yet, resolve now
@@ -238,7 +238,7 @@ export class ProcessManager {
       pid: record.pid,
       startupTime: Date.now() - record.startTime,
       maxDelay: Math.ceil(record.maxDelay / 1000),
-      logs: record.logs.map((l) => l.text).join('\n'),
+      logs: record.logs.map((l) => l.text).join("\n"),
     };
   }
 
@@ -284,7 +284,7 @@ export class ProcessManager {
     return new Promise<KillResult>((resolve) => {
       // SIGKILL escalation timer
       const sigkillTimer = setTimeout(() => {
-        record.process.kill('SIGKILL');
+        record.process.kill("SIGKILL");
       }, SIGKILL_DELAY_MS);
 
       // Listen for exit
@@ -299,10 +299,10 @@ export class ProcessManager {
         });
       };
 
-      record.process.once('exit', onExit);
+      record.process.once("exit", onExit);
 
       // Send SIGTERM
-      record.process.kill('SIGTERM');
+      record.process.kill("SIGTERM");
     });
   }
 

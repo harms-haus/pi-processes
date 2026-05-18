@@ -2,10 +2,10 @@ import type {
   ExtensionAPI,
   ExtensionContext,
   ToolDefinition,
-} from '@earendil-works/pi-coding-agent';
-import { beforeEach, describe, expect, it, vi, type MockedFunction } from 'vitest';
+} from "@earendil-works/pi-coding-agent";
+import { beforeEach, describe, expect, it, vi, type MockedFunction } from "vitest";
 
-import type { ProcessManager } from '../process-manager.js';
+import type { ProcessManager } from "../process-manager.js";
 
 // ── Hoisted mock state ──────────────────────────────────────────────────────
 
@@ -18,25 +18,25 @@ const MockProcessManager = vi.hoisted(() => {
   }));
 });
 
-vi.mock('../process-manager.js', () => ({
+vi.mock("../process-manager.js", () => ({
   ProcessManager: MockProcessManager,
 }));
 
 const toolFactoryMocks = vi.hoisted(() => ({
   createStartProcessTool: vi.fn<(gm: () => ProcessManager) => ToolDefinition<any>>(
-    (_getManager: () => ProcessManager) => ({ name: 'start_process' }) as ToolDefinition<any>,
+    (_getManager: () => ProcessManager) => ({ name: "start_process" }) as ToolDefinition<any>,
   ),
   createListProcessesTool: vi.fn<(gm: () => ProcessManager) => ToolDefinition<any>>(
-    (_getManager: () => ProcessManager) => ({ name: 'list_processes' }) as ToolDefinition<any>,
+    (_getManager: () => ProcessManager) => ({ name: "list_processes" }) as ToolDefinition<any>,
   ),
   createKillProcessTool: vi.fn<(gm: () => ProcessManager) => ToolDefinition<any>>(
-    (_getManager: () => ProcessManager) => ({ name: 'kill_process' }) as ToolDefinition<any>,
+    (_getManager: () => ProcessManager) => ({ name: "kill_process" }) as ToolDefinition<any>,
   ),
   createProcessLogsTool: vi.fn<(gm: () => ProcessManager) => ToolDefinition<any>>(
-    (_getManager: () => ProcessManager) => ({ name: 'process_logs' }) as ToolDefinition<any>,
+    (_getManager: () => ProcessManager) => ({ name: "process_logs" }) as ToolDefinition<any>,
   ),
   createRestartProcessTool: vi.fn<(gm: () => ProcessManager) => ToolDefinition<any>>(
-    (_getManager: () => ProcessManager) => ({ name: 'restart_process' }) as ToolDefinition<any>,
+    (_getManager: () => ProcessManager) => ({ name: "restart_process" }) as ToolDefinition<any>,
   ),
 }));
 
@@ -48,39 +48,39 @@ const {
   createRestartProcessTool,
 } = toolFactoryMocks;
 
-vi.mock('../tools/start-process.js', () => ({
+vi.mock("../tools/start-process.js", () => ({
   createStartProcessTool,
 }));
-vi.mock('../tools/list-processes.js', () => ({
+vi.mock("../tools/list-processes.js", () => ({
   createListProcessesTool,
 }));
-vi.mock('../tools/kill-process.js', () => ({
+vi.mock("../tools/kill-process.js", () => ({
   createKillProcessTool,
 }));
-vi.mock('../tools/process-logs.js', () => ({
+vi.mock("../tools/process-logs.js", () => ({
   createProcessLogsTool,
 }));
-vi.mock('../tools/restart-process.js', () => ({
+vi.mock("../tools/restart-process.js", () => ({
   createRestartProcessTool,
 }));
 
 const mockLogDialog = vi.hoisted(() => vi.fn());
-vi.mock('../ui/log-dialog.js', () => ({
+vi.mock("../ui/log-dialog.js", () => ({
   LogDialog: mockLogDialog,
 }));
 
-vi.mock('../ui/format-timestamp.js', () => ({
+vi.mock("../ui/format-timestamp.js", () => ({
   formatLogTimestamp: vi.fn((ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
-    const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
-    const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
-    const seconds = String(totalSeconds % 60).padStart(2, '0');
-    const millis = String(ms % 1000).padStart(3, '0');
+    const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
+    const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
+    const seconds = String(totalSeconds % 60).padStart(2, "0");
+    const millis = String(ms % 1000).padStart(3, "0");
     return `+${hours}:${minutes}:${seconds}.${millis}`;
   }),
 }));
 
-vi.mock('@earendil-works/pi-tui', () => ({
+vi.mock("@earendil-works/pi-tui", () => ({
   Key: {
     ctrlAlt: (key: string) => `ctrl+alt+${key}`,
   },
@@ -124,7 +124,7 @@ function createMockCtx(overrides?: Partial<ExtensionContext>): ExtensionContext 
       setEditorText: vi.fn(),
     },
     hasUI: true,
-    cwd: '/test',
+    cwd: "/test",
     sessionManager: {} as any,
     modelRegistry: {} as any,
     model: undefined,
@@ -139,58 +139,58 @@ function createMockCtx(overrides?: Partial<ExtensionContext>): ExtensionContext 
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
-describe('index (extension entry point)', () => {
+describe("index (extension entry point)", () => {
   // Re-import the module for each test so the closure state is fresh.
   let extension: (pi: ExtensionAPI) => void;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    const mod = await import('../index.js');
+    const mod = await import("../index.js");
     extension = mod.default;
   });
 
   // 1. session_start handler
-  describe('session_start handler', () => {
-    it('creates a ProcessManager and registers it', async () => {
+  describe("session_start handler", () => {
+    it("creates a ProcessManager and registers it", async () => {
       const { api, handlers } = createMockAPI();
       extension(api);
 
       const ctx = createMockCtx();
-      const handler = handlers.get('session_start')!;
+      const handler = handlers.get("session_start")!;
       await handler({}, ctx);
 
       expect(MockProcessManager).toHaveBeenCalledTimes(1);
     });
 
-    it('wires up onProcessCountChange callback', async () => {
+    it("wires up onProcessCountChange callback", async () => {
       const { api, handlers } = createMockAPI();
       extension(api);
 
       const ctx = createMockCtx();
-      const handler = handlers.get('session_start')!;
+      const handler = handlers.get("session_start")!;
       await handler({}, ctx);
 
       const instance = MockProcessManager.mock.results[0].value;
       expect(instance.onProcessCountChange).toHaveBeenCalledTimes(1);
     });
 
-    it('calls ctx.ui.notify when hasUI is true', async () => {
+    it("calls ctx.ui.notify when hasUI is true", async () => {
       const { api, handlers } = createMockAPI();
       extension(api);
 
       const ctx = createMockCtx({ hasUI: true });
-      const handler = handlers.get('session_start')!;
+      const handler = handlers.get("session_start")!;
       await handler({}, ctx);
 
-      expect(ctx.ui.notify).toHaveBeenCalledWith('pi-processes loaded', 'info');
+      expect(ctx.ui.notify).toHaveBeenCalledWith("pi-processes loaded", "info");
     });
 
-    it('does not call ctx.ui.notify when hasUI is false', async () => {
+    it("does not call ctx.ui.notify when hasUI is false", async () => {
       const { api, handlers } = createMockAPI();
       extension(api);
 
       const ctx = createMockCtx({ hasUI: false });
-      const handler = handlers.get('session_start')!;
+      const handler = handlers.get("session_start")!;
       await handler({}, ctx);
 
       expect(ctx.ui.notify).not.toHaveBeenCalled();
@@ -198,66 +198,66 @@ describe('index (extension entry point)', () => {
   });
 
   // 2. session_shutdown handler
-  describe('session_shutdown handler', () => {
-    it('calls manager.shutdown() and clears state', async () => {
+  describe("session_shutdown handler", () => {
+    it("calls manager.shutdown() and clears state", async () => {
       const { api, handlers } = createMockAPI();
       extension(api);
 
       // First start a session to create a manager
-      const startHandler = handlers.get('session_start')!;
+      const startHandler = handlers.get("session_start")!;
       await startHandler({}, createMockCtx());
 
       const instance = MockProcessManager.mock.results[0].value;
 
       // Now trigger shutdown
-      const shutdownHandler = handlers.get('session_shutdown')!;
+      const shutdownHandler = handlers.get("session_shutdown")!;
       await shutdownHandler({});
 
       expect(instance.shutdown).toHaveBeenCalledTimes(1);
     });
 
-    it('clears status on shutdown when hasUI is true', async () => {
+    it("clears status on shutdown when hasUI is true", async () => {
       const { api, handlers } = createMockAPI();
       extension(api);
 
       const ctx = createMockCtx({ hasUI: true });
-      const startHandler = handlers.get('session_start')!;
+      const startHandler = handlers.get("session_start")!;
       await startHandler({}, ctx);
 
-      const shutdownHandler = handlers.get('session_shutdown')!;
+      const shutdownHandler = handlers.get("session_shutdown")!;
       await shutdownHandler({});
 
-      expect(ctx.ui.setStatus).toHaveBeenCalledWith('pi-processes', undefined);
+      expect(ctx.ui.setStatus).toHaveBeenCalledWith("pi-processes", undefined);
     });
 
-    it('skips clearing status when hasUI is false (currentCtx null)', async () => {
+    it("skips clearing status when hasUI is false (currentCtx null)", async () => {
       const { api, handlers } = createMockAPI();
       extension(api);
 
       const ctx = createMockCtx({ hasUI: false });
-      const startHandler = handlers.get('session_start')!;
+      const startHandler = handlers.get("session_start")!;
       await startHandler({}, ctx);
 
-      const shutdownHandler = handlers.get('session_shutdown')!;
+      const shutdownHandler = handlers.get("session_shutdown")!;
       await shutdownHandler({});
 
       // ctx.ui.setStatus was never called because hasUI is false
       expect(ctx.ui.setStatus).not.toHaveBeenCalled();
     });
 
-    it('is safe when no session was started', async () => {
+    it("is safe when no session was started", async () => {
       const { api, handlers } = createMockAPI();
       extension(api);
 
-      const shutdownHandler = handlers.get('session_shutdown')!;
+      const shutdownHandler = handlers.get("session_shutdown")!;
       // Should not throw even without a prior session_start
       await expect(shutdownHandler({})).resolves.toBeUndefined();
     });
   });
 
   // 3. getManager() throws when manager is null
-  describe('getManager()', () => {
-    it('throws when called before session_start', async () => {
+  describe("getManager()", () => {
+    it("throws when called before session_start", () => {
       const { api } = createMockAPI();
       extension(api);
 
@@ -267,15 +267,15 @@ describe('index (extension entry point)', () => {
       const getManager = (createStartProcessTool as MockedFunction<any>).mock
         .calls[0][0] as () => ProcessManager;
 
-      expect(() => getManager()).toThrow('ProcessManager not initialized');
+      expect(() => getManager()).toThrow("ProcessManager not initialized");
     });
 
-    it('returns the manager after session_start', async () => {
+    it("returns the manager after session_start", async () => {
       const { api, handlers } = createMockAPI();
       extension(api);
 
       const ctx = createMockCtx();
-      const handler = handlers.get('session_start')!;
+      const handler = handlers.get("session_start")!;
       await handler({}, ctx);
 
       const getManager = (createStartProcessTool as MockedFunction<any>).mock
@@ -284,31 +284,31 @@ describe('index (extension entry point)', () => {
       expect(manager).toBeDefined();
     });
 
-    it('throws again after session_shutdown', async () => {
+    it("throws again after session_shutdown", async () => {
       const { api, handlers } = createMockAPI();
       extension(api);
 
       const ctx = createMockCtx();
-      const startHandler = handlers.get('session_start')!;
+      const startHandler = handlers.get("session_start")!;
       await startHandler({}, ctx);
 
-      const shutdownHandler = handlers.get('session_shutdown')!;
+      const shutdownHandler = handlers.get("session_shutdown")!;
       await shutdownHandler({});
 
       const getManager = (createStartProcessTool as MockedFunction<any>).mock
         .calls[0][0] as () => ProcessManager;
-      expect(() => getManager()).toThrow('ProcessManager not initialized');
+      expect(() => getManager()).toThrow("ProcessManager not initialized");
     });
   });
 
   // 4. Process count callback
-  describe('onProcessCountChange callback', () => {
-    it('calls setStatus with process names when hasUI is true', async () => {
+  describe("onProcessCountChange callback", () => {
+    it("calls setStatus with process names when hasUI is true", async () => {
       const { api, handlers } = createMockAPI();
       extension(api);
 
       const ctx = createMockCtx({ hasUI: true });
-      const handler = handlers.get('session_start')!;
+      const handler = handlers.get("session_start")!;
       await handler({}, ctx);
 
       // Grab the callback registered via onProcessCountChange
@@ -316,19 +316,19 @@ describe('index (extension entry point)', () => {
       const callback = instance.onProcessCountChange.mock.calls[0][0] as () => void;
 
       // Make list() return some processes
-      instance.list.mockReturnValue([{ name: 'dev-server' }, { name: 'watcher' }]);
+      instance.list.mockReturnValue([{ name: "dev-server" }, { name: "watcher" }]);
 
       callback();
 
-      expect(ctx.ui.setStatus).toHaveBeenCalledWith('pi-processes', 'p: dev-server, watcher');
+      expect(ctx.ui.setStatus).toHaveBeenCalledWith("pi-processes", "p: dev-server, watcher");
     });
 
-    it('calls setStatus with empty string when no processes', async () => {
+    it("calls setStatus with empty string when no processes", async () => {
       const { api, handlers } = createMockAPI();
       extension(api);
 
       const ctx = createMockCtx({ hasUI: true });
-      const handler = handlers.get('session_start')!;
+      const handler = handlers.get("session_start")!;
       await handler({}, ctx);
 
       const instance = MockProcessManager.mock.results[0].value;
@@ -338,21 +338,21 @@ describe('index (extension entry point)', () => {
 
       callback();
 
-      expect(ctx.ui.setStatus).toHaveBeenCalledWith('pi-processes', '');
+      expect(ctx.ui.setStatus).toHaveBeenCalledWith("pi-processes", "");
     });
 
-    it('skips setStatus when hasUI is false', async () => {
+    it("skips setStatus when hasUI is false", async () => {
       const { api, handlers } = createMockAPI();
       extension(api);
 
       const ctx = createMockCtx({ hasUI: false });
-      const handler = handlers.get('session_start')!;
+      const handler = handlers.get("session_start")!;
       await handler({}, ctx);
 
       const instance = MockProcessManager.mock.results[0].value;
       const callback = instance.onProcessCountChange.mock.calls[0][0] as () => void;
 
-      instance.list.mockReturnValue([{ name: 'dev-server' }]);
+      instance.list.mockReturnValue([{ name: "dev-server" }]);
 
       callback();
 
@@ -361,8 +361,8 @@ describe('index (extension entry point)', () => {
   });
 
   // 5. Tool registration
-  describe('tool registration', () => {
-    it('registers all 5 tools', () => {
+  describe("tool registration", () => {
+    it("registers all 5 tools", () => {
       const { api, tools } = createMockAPI();
       extension(api);
 
@@ -370,19 +370,19 @@ describe('index (extension entry point)', () => {
       expect(tools).toHaveLength(5);
     });
 
-    it('registers tools with correct names', () => {
+    it("registers tools with correct names", () => {
       const { api, tools } = createMockAPI();
       extension(api);
 
       const names = tools.map((t) => t.name);
-      expect(names).toContain('start_process');
-      expect(names).toContain('list_processes');
-      expect(names).toContain('kill_process');
-      expect(names).toContain('process_logs');
-      expect(names).toContain('restart_process');
+      expect(names).toContain("start_process");
+      expect(names).toContain("list_processes");
+      expect(names).toContain("kill_process");
+      expect(names).toContain("process_logs");
+      expect(names).toContain("restart_process");
     });
 
-    it('passes getManager to each tool factory', () => {
+    it("passes getManager to each tool factory", () => {
       const { api } = createMockAPI();
       extension(api);
 
@@ -400,24 +400,24 @@ describe('index (extension entry point)', () => {
         createProcessLogsTool,
         createRestartProcessTool,
       ]) {
-        expect(typeof (factory as MockedFunction<any>).mock.calls[0][0]).toBe('function');
+        expect(typeof (factory as MockedFunction<any>).mock.calls[0][0]).toBe("function");
       }
     });
   });
 
   // 6. Shortcut registration
-  describe('shortcut registration', () => {
-    it('registers a Ctrl+Alt+P shortcut', async () => {
+  describe("shortcut registration", () => {
+    it("registers a Ctrl+Alt+P shortcut", () => {
       const { api } = createMockAPI();
       extension(api);
 
       expect(api.registerShortcut).toHaveBeenCalledWith(
-        'ctrl+alt+p',
+        "ctrl+alt+p",
         expect.objectContaining({ description: expect.any(String) }),
       );
     });
 
-    it('shortcut handler returns early when hasUI is false', async () => {
+    it("shortcut handler returns early when hasUI is false", async () => {
       const { api, shortcuts } = createMockAPI();
       extension(api);
       const handler = shortcuts[0].options.handler;
@@ -426,7 +426,7 @@ describe('index (extension entry point)', () => {
       expect(ctx.ui.custom).not.toHaveBeenCalled();
     });
 
-    it('shortcut handler returns early when manager is null', async () => {
+    it("shortcut handler returns early when manager is null", async () => {
       const { api, shortcuts } = createMockAPI();
       extension(api);
       const handler = shortcuts[0].options.handler;
@@ -435,10 +435,10 @@ describe('index (extension entry point)', () => {
       expect(ctx.ui.custom).not.toHaveBeenCalled();
     });
 
-    it('notifies when no processes are running', async () => {
+    it("notifies when no processes are running", async () => {
       const { api, shortcuts, handlers } = createMockAPI();
       extension(api);
-      const startHandler = handlers.get('session_start')!;
+      const startHandler = handlers.get("session_start")!;
       await startHandler({}, createMockCtx());
       const instance = MockProcessManager.mock.results[0].value;
       instance.list.mockReturnValue([]);
@@ -446,16 +446,16 @@ describe('index (extension entry point)', () => {
       const handler = shortcuts[0].options.handler;
       const ctx = createMockCtx();
       await handler(ctx);
-      expect(ctx.ui.notify).toHaveBeenCalledWith('No processes running. Start one first.', 'info');
+      expect(ctx.ui.notify).toHaveBeenCalledWith("No processes running. Start one first.", "info");
     });
 
-    it('opens overlay with correct options', async () => {
+    it("opens overlay with correct options", async () => {
       const { api, shortcuts, handlers } = createMockAPI();
       extension(api);
-      const startHandler = handlers.get('session_start')!;
+      const startHandler = handlers.get("session_start")!;
       await startHandler({}, createMockCtx());
       const instance = MockProcessManager.mock.results[0].value;
-      instance.list.mockReturnValue([{ name: 'dev-server', pid: 12345 }]);
+      instance.list.mockReturnValue([{ name: "dev-server", pid: 12345 }]);
       instance.getLogs.mockReturnValue([]);
 
       const handler = shortcuts[0].options.handler;
@@ -465,40 +465,40 @@ describe('index (extension entry point)', () => {
       expect(ctx.ui.custom).toHaveBeenCalledWith(expect.any(Function), {
         overlay: true,
         overlayOptions: {
-          anchor: 'center',
-          width: '66%',
-          maxHeight: '66%',
+          anchor: "center",
+          width: "66%",
+          maxHeight: "66%",
         },
       });
     });
 
-    it('inserts formatted logs on result', async () => {
+    it("inserts formatted logs on result", async () => {
       const { api, shortcuts, handlers } = createMockAPI();
       extension(api);
-      const startHandler = handlers.get('session_start')!;
+      const startHandler = handlers.get("session_start")!;
       await startHandler({}, createMockCtx());
       const instance = MockProcessManager.mock.results[0].value;
-      instance.list.mockReturnValue([{ name: 'dev-server' }]);
+      instance.list.mockReturnValue([{ name: "dev-server" }]);
       instance.getLogs.mockReturnValue([]);
 
-      const selectedLogs = [{ timestamp: 1000, stream: 'stdout', text: 'hello' }];
+      const selectedLogs = [{ timestamp: 1000, stream: "stdout", text: "hello" }];
       const ctx = createMockCtx();
-      ctx.ui.custom = vi.fn().mockResolvedValue({ selectedLogs, processName: 'dev-server' });
+      ctx.ui.custom = vi.fn().mockResolvedValue({ selectedLogs, processName: "dev-server" });
 
       const handler = shortcuts[0].options.handler;
       await handler(ctx);
 
-      expect(ctx.ui.setEditorText).toHaveBeenCalledWith('[+00:00:01.000] [stdout] hello');
-      expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining('1 log lines'), 'info');
+      expect(ctx.ui.setEditorText).toHaveBeenCalledWith("[+00:00:01.000] [stdout] hello");
+      expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("1 log lines"), "info");
     });
 
-    it('does nothing when dialog is cancelled (null result)', async () => {
+    it("does nothing when dialog is cancelled (null result)", async () => {
       const { api, shortcuts, handlers } = createMockAPI();
       extension(api);
-      const startHandler = handlers.get('session_start')!;
+      const startHandler = handlers.get("session_start")!;
       await startHandler({}, createMockCtx());
       const instance = MockProcessManager.mock.results[0].value;
-      instance.list.mockReturnValue([{ name: 'dev-server' }]);
+      instance.list.mockReturnValue([{ name: "dev-server" }]);
       instance.getLogs.mockReturnValue([]);
 
       const ctx = createMockCtx();

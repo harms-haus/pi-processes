@@ -1,22 +1,22 @@
-import { Container, Text } from '@earendil-works/pi-tui';
-import { DEFAULT_START_DELAY, StartProcessSchema } from '../types.js';
-import { formatStartupResult } from './format-startup-result.js';
-import type { ProcessManager } from '../process-manager.js';
-import type { StartupResult } from '../types.js';
-import type { ToolDefinition } from '@earendil-works/pi-coding-agent';
+import { Container, Text } from "@earendil-works/pi-tui";
+import { DEFAULT_START_DELAY, StartProcessSchema } from "../types.js";
+import { formatStartupResult } from "./format-startup-result.js";
+import type { ProcessManager } from "../process-manager.js";
+import type { StartupResult } from "../types.js";
+import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 
 export function createStartProcessTool(
   getManager: () => ProcessManager,
 ): ToolDefinition<typeof StartProcessSchema, StartupResult> {
   return {
-    name: 'start_process',
-    label: 'Start Process',
+    name: "start_process",
+    label: "Start Process",
     description:
-      'Start a long-running process (e.g., debug server, API server). Waits for startup logs to settle before returning.',
-    promptSnippet: 'Start a managed process with startup debounce',
+      "Start a long-running process (e.g., debug server, API server). Waits for startup logs to settle before returning.",
+    promptSnippet: "Start a managed process with startup debounce",
     promptGuidelines: [
-      'Use start_process to start servers, watchers, or long-running commands.',
-      'start_process returns startup logs once output has been quiet for start_delay seconds.',
+      "Use start_process to start servers, watchers, or long-running commands.",
+      "start_process returns startup logs once output has been quiet for start_delay seconds.",
     ],
     parameters: StartProcessSchema,
     async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
@@ -25,8 +25,8 @@ export function createStartProcessTool(
       return {
         content: [
           {
-            type: 'text',
-            text: formatStartupResult('started', result),
+            type: "text",
+            text: formatStartupResult("started", result),
           },
         ],
         details: result,
@@ -34,19 +34,19 @@ export function createStartProcessTool(
     },
     renderCall(args, theme) {
       return new Text(
-        theme.fg('toolTitle', theme.bold('start_process ')) + theme.fg('accent', args.name),
+        theme.fg("toolTitle", theme.bold("start_process ")) + theme.fg("accent", args.name),
         0,
         0,
       );
     },
     renderResult(result, _options, theme) {
-      const details = result.details as StartupResult;
+      const details = result.details;
       const container = new Container();
       container.addChild(
         new Text(
-          theme.fg('success', theme.bold(`✓ ${details.name}`)) +
-            theme.fg('dim', ` PID ${details.pid}`) +
-            theme.fg('dim', ` | startup ${(details.startupTime / 1000).toFixed(1)}s`),
+          theme.fg("success", theme.bold(`✓ ${details.name}`)) +
+            theme.fg("dim", ` PID ${details.pid}`) +
+            theme.fg("dim", ` | startup ${(details.startupTime / 1000).toFixed(1)}s`),
           0,
           0,
         ),

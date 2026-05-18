@@ -2,8 +2,8 @@
  * Shared types for the pi-processes extension
  */
 
-import { Type } from 'typebox';
-import type { ChildProcess } from 'node:child_process';
+import { Type } from "typebox";
+import type { ChildProcess } from "node:child_process";
 
 // ── Theme Types ─────────────────────────────────────────────────────────────
 
@@ -21,7 +21,7 @@ export interface LogEntry {
   /** Monotonic timestamp (ms since process start) */
   timestamp: number;
   /** Which stream this line came from */
-  stream: 'stdout' | 'stderr';
+  stream: "stdout" | "stderr";
   /** The text content of the log line (no trailing newline) */
   text: string;
 }
@@ -137,20 +137,20 @@ export const MAX_LOG_ENTRIES = 10000;
 
 export const StartProcessSchema = Type.Object({
   name: Type.String({
-    description: 'Unique name to identify this process',
+    description: "Unique name to identify this process",
     minLength: 1,
     maxLength: 64,
-    pattern: '^[a-zA-Z0-9_-]+$',
+    pattern: "^[a-zA-Z0-9_-]+$",
   }),
   command: Type.String({
-    description: 'Shell command to start the process',
+    description: "Shell command to start the process",
     minLength: 1,
     maxLength: 4096,
   }),
   start_delay: Type.Optional(
     Type.Number({
       description:
-        'Debounce delay in seconds. Tool returns when no output appears for this duration. Default: 5',
+        "Debounce delay in seconds. Tool returns when no output appears for this duration. Default: 5",
       minimum: 1,
       maximum: 120,
     }),
@@ -159,62 +159,62 @@ export const StartProcessSchema = Type.Object({
 
 export const KillProcessSchema = Type.Object({
   name: Type.String({
-    description: 'Name of the process to kill',
+    description: "Name of the process to kill",
     minLength: 1,
     maxLength: 64,
-    pattern: '^[a-zA-Z0-9_-]+$',
+    pattern: "^[a-zA-Z0-9_-]+$",
   }),
 });
 
 export const ProcessLogsSchema = Type.Object({
   name: Type.String({
-    description: 'Name of the process',
+    description: "Name of the process",
     minLength: 1,
     maxLength: 64,
-    pattern: '^[a-zA-Z0-9_-]+$',
+    pattern: "^[a-zA-Z0-9_-]+$",
   }),
-  head: Type.Optional(Type.Number({ description: 'Return the first N lines', minimum: 1 })),
-  tail: Type.Optional(Type.Number({ description: 'Return the last N lines', minimum: 1 })),
+  head: Type.Optional(Type.Number({ description: "Return the first N lines", minimum: 1 })),
+  tail: Type.Optional(Type.Number({ description: "Return the last N lines", minimum: 1 })),
   start: Type.Optional(
     Type.Number({
-      description: 'Start line number (1-based, inclusive)',
+      description: "Start line number (1-based, inclusive)",
       minimum: 1,
     }),
   ),
   end: Type.Optional(
-    Type.Number({ description: 'End line number (1-based, inclusive)', minimum: 1 }),
+    Type.Number({ description: "End line number (1-based, inclusive)", minimum: 1 }),
   ),
   grep: Type.Optional(
     Type.String({
-      description: 'Filter log lines by pattern (regex by default)',
+      description: "Filter log lines by pattern (regex by default)",
       maxLength: 256,
     }),
   ),
   grepLiteral: Type.Optional(
     Type.Boolean({
-      description: 'Treat grep pattern as literal string instead of regex',
+      description: "Treat grep pattern as literal string instead of regex",
     }),
   ),
-  grepIgnoreCase: Type.Optional(Type.Boolean({ description: 'Case-insensitive grep matching' })),
+  grepIgnoreCase: Type.Optional(Type.Boolean({ description: "Case-insensitive grep matching" })),
 });
 
 export const RestartProcessSchema = Type.Object({
   name: Type.String({
-    description: 'Name of the process to restart',
+    description: "Name of the process to restart",
     minLength: 1,
     maxLength: 64,
-    pattern: '^[a-zA-Z0-9_-]+$',
+    pattern: "^[a-zA-Z0-9_-]+$",
   }),
   command: Type.Optional(
     Type.String({
-      description: 'New command to use (defaults to previous command)',
+      description: "New command to use (defaults to previous command)",
       minLength: 1,
       maxLength: 4096,
     }),
   ),
   start_delay: Type.Optional(
     Type.Number({
-      description: 'Debounce delay in seconds. Default: 5',
+      description: "Debounce delay in seconds. Default: 5",
       minimum: 1,
       maximum: 120,
     }),

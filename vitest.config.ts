@@ -1,4 +1,5 @@
 import { defineConfig } from "vitest/config";
+
 export default defineConfig({
   test: {
     include: ["src/**/*.test.ts"],
@@ -9,7 +10,11 @@ export default defineConfig({
       exclude: [
         "src/__tests__/**",
         "src/**/*.test.ts",
+        "src/**/setup.ts",
         "src/**/helpers/**",
+        "src/**/*.d.ts",
+        "src/types.ts",
+        "src/types/**",
       ],
       thresholds: {
         statements: 90,

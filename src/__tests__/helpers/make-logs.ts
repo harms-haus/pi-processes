@@ -1,4 +1,4 @@
-import type { LogEntry } from '../../types.js';
+import type { LogEntry } from "../../types.js";
 
 /**
  * Create a single LogEntry for testing.
@@ -9,7 +9,7 @@ import type { LogEntry } from '../../types.js';
  */
 export function makeLog(
   text: string,
-  stream: 'stdout' | 'stderr' = 'stdout',
+  stream: "stdout" | "stderr" = "stdout",
   offsetMs = 0,
 ): LogEntry {
   return { timestamp: offsetMs, text, stream };
@@ -20,5 +20,5 @@ export function makeLog(
  * Each entry has an offset of i*1000 ms.
  */
 export function makeLogs(count: number): LogEntry[] {
-  return Array.from({ length: count }, (_, i) => makeLog(`Line ${i + 1}`, 'stdout', i * 1000));
+  return Array.from({ length: count }, (_, i) => makeLog(`Line ${i + 1}`, "stdout", i * 1000));
 }

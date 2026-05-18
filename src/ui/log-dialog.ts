@@ -1,6 +1,6 @@
-import { Key, matchesKey, truncateToWidth } from '@earendil-works/pi-tui';
-import { formatLogTimestamp } from './format-timestamp.js';
-import type { LogEntry, ProcessInfo, ThemeStyle } from '../types.js';
+import { Key, matchesKey, truncateToWidth } from "@earendil-works/pi-tui";
+import { formatLogTimestamp } from "./format-timestamp.js";
+import type { LogEntry, ProcessInfo, ThemeStyle } from "../types.js";
 
 /**
  * Dialog component for browsing process logs with tab-based process switching,
@@ -115,20 +115,20 @@ export class LogDialog {
 
   private renderTabBar(width: number): string {
     if (this.processes.length === 0) {
-      return truncateToWidth(this.theme.fg('dim', 'No processes running'), width);
+      return truncateToWidth(this.theme.fg("dim", "No processes running"), width);
     }
 
     const parts: string[] = [];
     for (let i = 0; i < this.processes.length; i++) {
       const name = this.processes[i].name;
       if (i === this.activeTabIndex) {
-        parts.push(this.theme.fg('accent', this.theme.bold(name)));
+        parts.push(this.theme.fg("accent", this.theme.bold(name)));
       } else {
-        parts.push(this.theme.fg('muted', name));
+        parts.push(this.theme.fg("muted", name));
       }
     }
 
-    const separator = ' │ ';
+    const separator = " │ ";
     const joined = parts.join(separator);
     return truncateToWidth(joined, width);
   }
@@ -148,12 +148,12 @@ export class LogDialog {
     const logs = this.activeLogs;
 
     if (this.processes.length === 0) {
-      lines.push(truncateToWidth(this.theme.fg('dim', 'Start a process first'), width));
+      lines.push(truncateToWidth(this.theme.fg("dim", "Start a process first"), width));
       return lines;
     }
 
     if (logs.length === 0) {
-      lines.push(truncateToWidth(this.theme.fg('dim', 'No logs yet'), width));
+      lines.push(truncateToWidth(this.theme.fg("dim", "No logs yet"), width));
       return lines;
     }
 
@@ -163,7 +163,7 @@ export class LogDialog {
     // Scroll indicator above
     if (this.viewportOffset > 0) {
       const above = this.viewportOffset;
-      lines.push(truncateToWidth(this.theme.fg('dim', `↑ ${above} more above`), width));
+      lines.push(truncateToWidth(this.theme.fg("dim", `↑ ${above} more above`), width));
     }
 
     // Log lines
@@ -175,7 +175,7 @@ export class LogDialog {
     // Scroll indicator below
     if (endIdx < logs.length) {
       const below = logs.length - endIdx;
-      lines.push(truncateToWidth(this.theme.fg('dim', `↓ ${below} more below`), width));
+      lines.push(truncateToWidth(this.theme.fg("dim", `↓ ${below} more below`), width));
     }
 
     return lines;
@@ -187,17 +187,17 @@ export class LogDialog {
     const isCursor = index === this.selectedIndex;
 
     // Build the line content
-    const prefix = isCursor ? '▶ ' : '  ';
+    const prefix = isCursor ? "▶ " : "  ";
     const timestamp = formatLogTimestamp(entry.timestamp);
     const streamLabel =
-      entry.stream === 'stdout'
-        ? this.theme.fg('success', '[stdout]')
-        : this.theme.fg('error', '[stderr]');
+      entry.stream === "stdout"
+        ? this.theme.fg("success", "[stdout]")
+        : this.theme.fg("error", "[stderr]");
 
     const rawLine = `${prefix}${timestamp} ${streamLabel} ${entry.text}`;
 
     if (isSelected) {
-      return truncateToWidth(this.theme.bg('toolPendingBg', rawLine), width);
+      return truncateToWidth(this.theme.bg("toolPendingBg", rawLine), width);
     }
 
     return truncateToWidth(rawLine, width);
@@ -210,25 +210,25 @@ export class LogDialog {
     const logs = this.activeLogs;
 
     if (!proc) {
-      return truncateToWidth(this.theme.fg('dim', 'No process selected'), width);
+      return truncateToWidth(this.theme.fg("dim", "No process selected"), width);
     }
 
     // Status dot
-    const dot = proc.running ? this.theme.fg('success', '●') : this.theme.fg('error', '●');
+    const dot = proc.running ? this.theme.fg("success", "●") : this.theme.fg("error", "●");
 
-    const name = this.theme.fg('accent', proc.name);
-    const pidInfo = this.theme.fg('dim', `PID ${proc.pid}`);
-    const uptime = this.theme.fg('dim', `uptime: ${Math.floor(proc.uptimeSec)}s`);
-    const logCount = this.theme.fg('dim', `logs: ${logs.length}`);
-    const status = this.theme.fg('dim', `status: ${proc.running ? 'running' : 'exited'}`);
+    const name = this.theme.fg("accent", proc.name);
+    const pidInfo = this.theme.fg("dim", `PID ${proc.pid}`);
+    const uptime = this.theme.fg("dim", `uptime: ${Math.floor(proc.uptimeSec)}s`);
+    const logCount = this.theme.fg("dim", `logs: ${logs.length}`);
+    const status = this.theme.fg("dim", `status: ${proc.running ? "running" : "exited"}`);
 
     // Showing range
-    let rangeText = '';
+    let rangeText = "";
     if (logs.length > 0) {
       const effectiveHeight = Math.max(1, this.contentHeight);
       const endIdx = Math.min(this.viewportOffset + effectiveHeight, logs.length);
       rangeText = this.theme.fg(
-        'dim',
+        "dim",
         `showing ${this.viewportOffset + 1}-${endIdx} of ${logs.length}`,
       );
     }
@@ -238,7 +238,7 @@ export class LogDialog {
       parts.push(rangeText);
     }
 
-    const line = parts.join(' │ ');
+    const line = parts.join(" │ ");
     return truncateToWidth(line, width);
   }
 
@@ -246,8 +246,8 @@ export class LogDialog {
 
   private renderHelpBar(width: number): string {
     const text =
-      '[Tab] [⇧Tab] switch │ [↑↓] navigate │ [⇧↑⇧↓] select │ [Ctrl+Enter] insert │ [Esc] close';
-    return truncateToWidth(this.theme.fg('dim', text), width);
+      "[Tab] [⇧Tab] switch │ [↑↓] navigate │ [⇧↑⇧↓] select │ [Ctrl+Enter] insert │ [Esc] close";
+    return truncateToWidth(this.theme.fg("dim", text), width);
   }
 
   // ── Input Handling ───────────────────────────────────────────────────
@@ -263,7 +263,7 @@ export class LogDialog {
       return;
     }
 
-    if (matchesKey(data, Key.shift('tab'))) {
+    if (matchesKey(data, Key.shift("tab"))) {
       if (this.processes.length > 1) {
         this.activeTabIndex =
           (this.activeTabIndex - 1 + this.processes.length) % this.processes.length;
@@ -287,7 +287,7 @@ export class LogDialog {
     }
 
     // Multi-select
-    if (matchesKey(data, Key.shift('up'))) {
+    if (matchesKey(data, Key.shift("up"))) {
       if (this.selectionAnchor === null) {
         this.selectionAnchor = this.selectedIndex;
       }
@@ -296,7 +296,7 @@ export class LogDialog {
       return;
     }
 
-    if (matchesKey(data, Key.shift('down'))) {
+    if (matchesKey(data, Key.shift("down"))) {
       if (this.selectionAnchor === null) {
         this.selectionAnchor = this.selectedIndex;
       }
@@ -306,7 +306,7 @@ export class LogDialog {
     }
 
     // Insert selected logs
-    if (matchesKey(data, Key.ctrl('enter'))) {
+    if (matchesKey(data, Key.ctrl("enter"))) {
       const logs = this.getSelectedLogs();
       const proc = this.activeProcess;
       if (logs.length > 0 && proc) {

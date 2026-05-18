@@ -1,16 +1,16 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { LogDialog } from '../../ui/log-dialog.js';
-import { createMockTheme, makeLog, makeLogs } from '../helpers/index.js';
-import type { LogEntry, ProcessInfo } from '../../types.js';
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { LogDialog } from "../../ui/log-dialog.js";
+import { createMockTheme, makeLog, makeLogs } from "../helpers/index.js";
+import type { LogEntry, ProcessInfo } from "../../types.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Create a ProcessInfo for testing. */
 function makeProcess(overrides: Partial<ProcessInfo> = {}): ProcessInfo {
   return {
-    name: 'test-proc',
+    name: "test-proc",
     pid: 12345,
-    command: 'echo hello',
+    command: "echo hello",
     startTime: Date.now(),
     running: true,
     uptimeSec: 10,
@@ -23,20 +23,20 @@ function makeProcess(overrides: Partial<ProcessInfo> = {}): ProcessInfo {
 // Terminal escape sequences for keyboard input simulation.
 // These are the standard legacy sequences that matchesKey() recognizes.
 const KEYS = {
-  tab: '\t',
-  shiftTab: '\x1b[Z',
-  up: '\x1b[A',
-  down: '\x1b[B',
-  shiftUp: '\x1b[a',
-  shiftDown: '\x1b[b',
-  escape: '\x1b',
+  tab: "\t",
+  shiftTab: "\x1b[Z",
+  up: "\x1b[A",
+  down: "\x1b[B",
+  shiftUp: "\x1b[a",
+  shiftDown: "\x1b[b",
+  escape: "\x1b",
   // xterm modifyOtherKeys format for Ctrl+Enter: ESC[27;5;13~
-  ctrlEnter: '\x1b[27;5;13~',
+  ctrlEnter: "\x1b[27;5;13~",
 } as const;
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
-describe('LogDialog', () => {
+describe("LogDialog", () => {
   let theme: ReturnType<typeof createMockTheme>;
   let onDone: ReturnType<typeof vi.fn>;
   let renderFn: ReturnType<typeof vi.fn>;
@@ -59,96 +59,96 @@ describe('LogDialog', () => {
 
   // ── render() ─────────────────────────────────────────────────────────
 
-  describe('render', () => {
+  describe("render", () => {
     it("shows 'No processes running' when no processes", () => {
       const dialog = createDialog();
       const lines = dialog.render(80);
 
       // Tab bar should show "No processes running"
-      expect(lines[0]).toContain('No processes running');
+      expect(lines[0]).toContain("No processes running");
     });
 
-    it('renders tab bar with single process', () => {
-      const proc = makeProcess({ name: 'dev-server' });
+    it("renders tab bar with single process", () => {
+      const proc = makeProcess({ name: "dev-server" });
       const dialog = createDialog([proc]);
       const lines = dialog.render(80);
 
       // Tab bar should show the process name
-      expect(lines[0]).toContain('dev-server');
+      expect(lines[0]).toContain("dev-server");
     });
 
-    it('renders tab bar with multiple processes, highlighting active', () => {
-      const proc1 = makeProcess({ name: 'dev-server' });
-      const proc2 = makeProcess({ name: 'watcher' });
+    it("renders tab bar with multiple processes, highlighting active", () => {
+      const proc1 = makeProcess({ name: "dev-server" });
+      const proc2 = makeProcess({ name: "watcher" });
       const dialog = createDialog([proc1, proc2]);
       const lines = dialog.render(80);
 
       // First tab should be bold+accent (active), second should be muted
-      expect(lines[0]).toContain('dev-server');
-      expect(lines[0]).toContain('watcher');
+      expect(lines[0]).toContain("dev-server");
+      expect(lines[0]).toContain("watcher");
 
       // Check that bold was applied to the active process name
-      expect(theme.bold).toHaveBeenCalledWith('dev-server');
-      expect(theme.fg).toHaveBeenCalledWith('accent', '**dev-server**');
-      expect(theme.fg).toHaveBeenCalledWith('muted', 'watcher');
+      expect(theme.bold).toHaveBeenCalledWith("dev-server");
+      expect(theme.fg).toHaveBeenCalledWith("accent", "**dev-server**");
+      expect(theme.fg).toHaveBeenCalledWith("muted", "watcher");
     });
 
     it("shows 'No logs yet' for process with no logs", () => {
-      const proc = makeProcess({ name: 'dev-server' });
+      const proc = makeProcess({ name: "dev-server" });
       const dialog = createDialog([proc], new Map());
       const lines = dialog.render(80);
 
       // Content area should show "No logs yet"
-      const contentLines = lines.filter((l) => l.includes('No logs yet'));
+      const contentLines = lines.filter((l) => l.includes("No logs yet"));
       expect(contentLines.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('renders log lines with timestamps and stream labels', () => {
-      const proc = makeProcess({ name: 'dev-server' });
+    it("renders log lines with timestamps and stream labels", () => {
+      const proc = makeProcess({ name: "dev-server" });
       const logs = new Map<string, LogEntry[]>([
-        ['dev-server', [makeLog('Hello world', 'stdout', 1000)]],
+        ["dev-server", [makeLog("Hello world", "stdout", 1000)]],
       ]);
       const dialog = createDialog([proc], logs);
       const lines = dialog.render(80);
 
       // Should contain the timestamp format
-      expect(lines.some((l) => l.includes('+00:00:01.000'))).toBe(true);
+      expect(lines.some((l) => l.includes("+00:00:01.000"))).toBe(true);
       // Should contain the log text
-      expect(lines.some((l) => l.includes('Hello world'))).toBe(true);
+      expect(lines.some((l) => l.includes("Hello world"))).toBe(true);
       // Stream label should be present via theme.fg("success", "[stdout]")
-      expect(theme.fg).toHaveBeenCalledWith('success', '[stdout]');
+      expect(theme.fg).toHaveBeenCalledWith("success", "[stdout]");
     });
 
-    it('renders stderr stream label with error color', () => {
-      const proc = makeProcess({ name: 'dev-server' });
-      const logs = new Map<string, LogEntry[]>([['dev-server', [makeLog('Oops', 'stderr', 500)]]]);
+    it("renders stderr stream label with error color", () => {
+      const proc = makeProcess({ name: "dev-server" });
+      const logs = new Map<string, LogEntry[]>([["dev-server", [makeLog("Oops", "stderr", 500)]]]);
       const dialog = createDialog([proc], logs);
       dialog.render(80);
 
-      expect(theme.fg).toHaveBeenCalledWith('error', '[stderr]');
+      expect(theme.fg).toHaveBeenCalledWith("error", "[stderr]");
     });
 
-    it('highlights selected log line', () => {
-      const proc = makeProcess({ name: 'dev-server' });
-      const entries = [makeLog('Line A'), makeLog('Line B'), makeLog('Line C')];
-      const logs = new Map<string, LogEntry[]>([['dev-server', entries]]);
+    it("highlights selected log line", () => {
+      const proc = makeProcess({ name: "dev-server" });
+      const entries = [makeLog("Line A"), makeLog("Line B"), makeLog("Line C")];
+      const logs = new Map<string, LogEntry[]>([["dev-server", entries]]);
       const dialog = createDialog([proc], logs);
       const lines = dialog.render(80);
 
       // The selected line (index 0) should have "▶ " prefix
-      expect(lines.some((l) => l.includes('▶'))).toBe(true);
+      expect(lines.some((l) => l.includes("▶"))).toBe(true);
       // Non-selected lines should have "  " prefix
-      expect(lines.some((l) => l.includes('  '))).toBe(true);
+      expect(lines.some((l) => l.includes("  "))).toBe(true);
 
       // The selected line should have bg("toolPendingBg", ...) applied
-      expect(theme.bg).toHaveBeenCalledWith('toolPendingBg', expect.any(String));
+      expect(theme.bg).toHaveBeenCalledWith("toolPendingBg", expect.any(String));
     });
 
-    it('shows scroll indicators when logs overflow viewport', () => {
-      const proc = makeProcess({ name: 'dev-server' });
+    it("shows scroll indicators when logs overflow viewport", () => {
+      const proc = makeProcess({ name: "dev-server" });
       // Create more logs than viewport can hold
       const entries = makeLogs(30);
-      const logs = new Map<string, LogEntry[]>([['dev-server', entries]]);
+      const logs = new Map<string, LogEntry[]>([["dev-server", entries]]);
       const dialog = createDialog([proc], logs);
       dialog.setContentHeight(5);
 
@@ -161,7 +161,7 @@ describe('LogDialog', () => {
 
       // Should have scroll indicator(s)
       const hasScrollIndicator = lines.some(
-        (l) => l.includes('more above') || l.includes('more below'),
+        (l) => l.includes("more above") || l.includes("more below"),
       );
       expect(hasScrollIndicator).toBe(true);
     });
@@ -171,47 +171,47 @@ describe('LogDialog', () => {
       const lines = dialog.render(80);
 
       // Content should say "Start a process first" when no processes
-      expect(lines.some((l) => l.includes('Start a process first'))).toBe(true);
+      expect(lines.some((l) => l.includes("Start a process first"))).toBe(true);
     });
 
-    it('renders diagnostics footer with colored status dot', () => {
-      const proc = makeProcess({ name: 'dev-server', running: true });
+    it("renders diagnostics footer with colored status dot", () => {
+      const proc = makeProcess({ name: "dev-server", running: true });
       const dialog = createDialog([proc]);
       const lines = dialog.render(80);
 
       // Diagnostics should show process name, PID, uptime, etc.
-      const diagLine = lines.find((l) => l.includes('dev-server') && l.includes('PID'));
+      const diagLine = lines.find((l) => l.includes("dev-server") && l.includes("PID"));
       expect(diagLine).toBeDefined();
 
       // Running process should have green dot
-      expect(theme.fg).toHaveBeenCalledWith('success', '●');
-      expect(theme.fg).toHaveBeenCalledWith('accent', 'dev-server');
+      expect(theme.fg).toHaveBeenCalledWith("success", "●");
+      expect(theme.fg).toHaveBeenCalledWith("accent", "dev-server");
     });
 
-    it('renders diagnostics with red dot for stopped process', () => {
-      const proc = makeProcess({ name: 'dev-server', running: false });
+    it("renders diagnostics with red dot for stopped process", () => {
+      const proc = makeProcess({ name: "dev-server", running: false });
       const dialog = createDialog([proc]);
       dialog.render(80);
 
-      expect(theme.fg).toHaveBeenCalledWith('error', '●');
+      expect(theme.fg).toHaveBeenCalledWith("error", "●");
     });
 
-    it('renders help bar with keybinding hints', () => {
+    it("renders help bar with keybinding hints", () => {
       const dialog = createDialog();
       // Use wide width so mock theme tags don't cause truncation
       const lines = dialog.render(200);
 
       // Help bar should contain key hints
       const helpLine = lines[lines.length - 1];
-      expect(helpLine).toContain('[Tab]');
-      expect(helpLine).toContain('[Esc]');
-      expect(helpLine).toContain('Ctrl+Enter');
+      expect(helpLine).toContain("[Tab]");
+      expect(helpLine).toContain("[Esc]");
+      expect(helpLine).toContain("Ctrl+Enter");
     });
 
-    it('truncates lines to fit width', () => {
-      const proc = makeProcess({ name: 'dev-server' });
-      const longText = 'A'.repeat(200);
-      const logs = new Map<string, LogEntry[]>([['dev-server', [makeLog(longText, 'stdout', 0)]]]);
+    it("truncates lines to fit width", () => {
+      const proc = makeProcess({ name: "dev-server" });
+      const longText = "A".repeat(200);
+      const logs = new Map<string, LogEntry[]>([["dev-server", [makeLog(longText, "stdout", 0)]]]);
       const dialog = createDialog([proc], logs);
       const lines = dialog.render(40);
 
@@ -226,13 +226,13 @@ describe('LogDialog', () => {
 
   // ── handleInput() ────────────────────────────────────────────────────
 
-  describe('handleInput', () => {
-    it('switches to next tab on Tab', () => {
-      const proc1 = makeProcess({ name: 'alpha' });
-      const proc2 = makeProcess({ name: 'beta' });
+  describe("handleInput", () => {
+    it("switches to next tab on Tab", () => {
+      const proc1 = makeProcess({ name: "alpha" });
+      const proc2 = makeProcess({ name: "beta" });
       const logs = new Map<string, LogEntry[]>([
-        ['alpha', [makeLog('Alpha log')]],
-        ['beta', [makeLog('Beta log')]],
+        ["alpha", [makeLog("Alpha log")]],
+        ["beta", [makeLog("Beta log")]],
       ]);
       const dialog = createDialog([proc1, proc2], logs);
 
@@ -240,15 +240,15 @@ describe('LogDialog', () => {
 
       dialog.render(80);
       // "beta" should now be bold (active)
-      expect(theme.bold).toHaveBeenCalledWith('beta');
+      expect(theme.bold).toHaveBeenCalledWith("beta");
     });
 
-    it('switches to previous tab on Shift+Tab', () => {
-      const proc1 = makeProcess({ name: 'alpha' });
-      const proc2 = makeProcess({ name: 'beta' });
+    it("switches to previous tab on Shift+Tab", () => {
+      const proc1 = makeProcess({ name: "alpha" });
+      const proc2 = makeProcess({ name: "beta" });
       const logs = new Map<string, LogEntry[]>([
-        ['alpha', [makeLog('Alpha log')]],
-        ['beta', [makeLog('Beta log')]],
+        ["alpha", [makeLog("Alpha log")]],
+        ["beta", [makeLog("Beta log")]],
       ]);
       const dialog = createDialog([proc1, proc2], logs);
 
@@ -259,13 +259,13 @@ describe('LogDialog', () => {
 
       dialog.render(80);
       // "alpha" should be active again (bold)
-      expect(theme.bold).toHaveBeenCalledWith('alpha');
+      expect(theme.bold).toHaveBeenCalledWith("alpha");
     });
 
-    it('moves selection down on Down arrow', () => {
-      const proc = makeProcess({ name: 'dev-server' });
-      const entries = [makeLog('Line 1'), makeLog('Line 2'), makeLog('Line 3')];
-      const logs = new Map<string, LogEntry[]>([['dev-server', entries]]);
+    it("moves selection down on Down arrow", () => {
+      const proc = makeProcess({ name: "dev-server" });
+      const entries = [makeLog("Line 1"), makeLog("Line 2"), makeLog("Line 3")];
+      const logs = new Map<string, LogEntry[]>([["dev-server", entries]]);
       const dialog = createDialog([proc], logs);
 
       dialog.handleInput(KEYS.down);
@@ -273,13 +273,13 @@ describe('LogDialog', () => {
 
       // After pressing down, the cursor "▶" should be at index 1
       // So the bg("toolPendingBg") should have been called for line at index 1
-      expect(theme.bg).toHaveBeenCalledWith('toolPendingBg', expect.stringContaining('Line 2'));
+      expect(theme.bg).toHaveBeenCalledWith("toolPendingBg", expect.stringContaining("Line 2"));
     });
 
-    it('moves selection up on Up arrow', () => {
-      const proc = makeProcess({ name: 'dev-server' });
-      const entries = [makeLog('Line 1'), makeLog('Line 2'), makeLog('Line 3')];
-      const logs = new Map<string, LogEntry[]>([['dev-server', entries]]);
+    it("moves selection up on Up arrow", () => {
+      const proc = makeProcess({ name: "dev-server" });
+      const entries = [makeLog("Line 1"), makeLog("Line 2"), makeLog("Line 3")];
+      const logs = new Map<string, LogEntry[]>([["dev-server", entries]]);
       const dialog = createDialog([proc], logs);
 
       // Move down twice then up once
@@ -289,13 +289,13 @@ describe('LogDialog', () => {
       dialog.render(80);
 
       // Cursor should be at index 1 (Line 2)
-      expect(theme.bg).toHaveBeenCalledWith('toolPendingBg', expect.stringContaining('Line 2'));
+      expect(theme.bg).toHaveBeenCalledWith("toolPendingBg", expect.stringContaining("Line 2"));
     });
 
-    it('extends selection down on Shift+Down', () => {
-      const proc = makeProcess({ name: 'dev-server' });
-      const entries = [makeLog('Line 1'), makeLog('Line 2'), makeLog('Line 3')];
-      const logs = new Map<string, LogEntry[]>([['dev-server', entries]]);
+    it("extends selection down on Shift+Down", () => {
+      const proc = makeProcess({ name: "dev-server" });
+      const entries = [makeLog("Line 1"), makeLog("Line 2"), makeLog("Line 3")];
+      const logs = new Map<string, LogEntry[]>([["dev-server", entries]]);
       const dialog = createDialog([proc], logs);
 
       dialog.handleInput(KEYS.shiftDown);
@@ -304,14 +304,14 @@ describe('LogDialog', () => {
       // Both index 0 and 1 should be selected (in the bg call)
       // Line 1 should be selected (it's the anchor at 0)
       // Line 2 should be selected (it's the new position at 1)
-      const bgCalls = theme.bg.mock.calls.filter((c) => c[0] === 'toolPendingBg');
+      const bgCalls = theme.bg.mock.calls.filter((c) => c[0] === "toolPendingBg");
       expect(bgCalls.length).toBeGreaterThanOrEqual(2);
     });
 
-    it('extends selection up on Shift+Up', () => {
-      const proc = makeProcess({ name: 'dev-server' });
-      const entries = [makeLog('Line 1'), makeLog('Line 2'), makeLog('Line 3')];
-      const logs = new Map<string, LogEntry[]>([['dev-server', entries]]);
+    it("extends selection up on Shift+Up", () => {
+      const proc = makeProcess({ name: "dev-server" });
+      const entries = [makeLog("Line 1"), makeLog("Line 2"), makeLog("Line 3")];
+      const logs = new Map<string, LogEntry[]>([["dev-server", entries]]);
       const dialog = createDialog([proc], logs);
 
       // Move to index 2
@@ -322,12 +322,12 @@ describe('LogDialog', () => {
       dialog.render(80);
 
       // Should have a multi-line selection (index 1 and 2)
-      const bgCalls = theme.bg.mock.calls.filter((c) => c[0] === 'toolPendingBg');
+      const bgCalls = theme.bg.mock.calls.filter((c) => c[0] === "toolPendingBg");
       expect(bgCalls.length).toBeGreaterThanOrEqual(2);
     });
 
-    it('calls onDone(null) on Escape', () => {
-      const proc = makeProcess({ name: 'dev-server' });
+    it("calls onDone(null) on Escape", () => {
+      const proc = makeProcess({ name: "dev-server" });
       const dialog = createDialog([proc]);
 
       dialog.handleInput(KEYS.escape);
@@ -336,25 +336,25 @@ describe('LogDialog', () => {
       expect(onDone).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onDone with selected logs on Ctrl+Enter', () => {
-      const proc = makeProcess({ name: 'dev-server' });
-      const entries = [makeLog('Line 1'), makeLog('Line 2')];
-      const logs = new Map<string, LogEntry[]>([['dev-server', entries]]);
+    it("calls onDone with selected logs on Ctrl+Enter", () => {
+      const proc = makeProcess({ name: "dev-server" });
+      const entries = [makeLog("Line 1"), makeLog("Line 2")];
+      const logs = new Map<string, LogEntry[]>([["dev-server", entries]]);
       const dialog = createDialog([proc], logs);
 
       dialog.handleInput(KEYS.ctrlEnter);
 
       expect(onDone).toHaveBeenCalledTimes(1);
       const result = onDone.mock.calls[0][0];
-      expect(result.processName).toBe('dev-server');
+      expect(result.processName).toBe("dev-server");
       expect(result.selectedLogs).toHaveLength(1);
-      expect(result.selectedLogs[0].text).toBe('Line 1');
+      expect(result.selectedLogs[0].text).toBe("Line 1");
     });
 
-    it('calls onDone with multi-selected logs on Ctrl+Enter', () => {
-      const proc = makeProcess({ name: 'dev-server' });
-      const entries = [makeLog('Line 1'), makeLog('Line 2'), makeLog('Line 3')];
-      const logs = new Map<string, LogEntry[]>([['dev-server', entries]]);
+    it("calls onDone with multi-selected logs on Ctrl+Enter", () => {
+      const proc = makeProcess({ name: "dev-server" });
+      const entries = [makeLog("Line 1"), makeLog("Line 2"), makeLog("Line 3")];
+      const logs = new Map<string, LogEntry[]>([["dev-server", entries]]);
       const dialog = createDialog([proc], logs);
 
       // Extend selection to include lines 1 and 2
@@ -363,14 +363,14 @@ describe('LogDialog', () => {
 
       expect(onDone).toHaveBeenCalledTimes(1);
       const result = onDone.mock.calls[0][0];
-      expect(result.processName).toBe('dev-server');
+      expect(result.processName).toBe("dev-server");
       expect(result.selectedLogs).toHaveLength(2);
-      expect(result.selectedLogs[0].text).toBe('Line 1');
-      expect(result.selectedLogs[1].text).toBe('Line 2');
+      expect(result.selectedLogs[0].text).toBe("Line 1");
+      expect(result.selectedLogs[1].text).toBe("Line 2");
     });
 
-    it('does not call onDone on Ctrl+Enter when no logs', () => {
-      const proc = makeProcess({ name: 'dev-server' });
+    it("does not call onDone on Ctrl+Enter when no logs", () => {
+      const proc = makeProcess({ name: "dev-server" });
       const dialog = createDialog([proc], new Map());
 
       dialog.handleInput(KEYS.ctrlEnter);
@@ -378,12 +378,12 @@ describe('LogDialog', () => {
       expect(onDone).not.toHaveBeenCalled();
     });
 
-    it('wraps tab index on Tab at last process', () => {
-      const proc1 = makeProcess({ name: 'alpha' });
-      const proc2 = makeProcess({ name: 'beta' });
+    it("wraps tab index on Tab at last process", () => {
+      const proc1 = makeProcess({ name: "alpha" });
+      const proc2 = makeProcess({ name: "beta" });
       const logs = new Map<string, LogEntry[]>([
-        ['alpha', [makeLog('Alpha log')]],
-        ['beta', [makeLog('Beta log')]],
+        ["alpha", [makeLog("Alpha log")]],
+        ["beta", [makeLog("Beta log")]],
       ]);
       const dialog = createDialog([proc1, proc2], logs);
 
@@ -393,15 +393,15 @@ describe('LogDialog', () => {
 
       dialog.render(80);
       // alpha should be active (bold) again after wrapping
-      expect(theme.bold).toHaveBeenCalledWith('alpha');
+      expect(theme.bold).toHaveBeenCalledWith("alpha");
     });
 
-    it('wraps tab index on Shift+Tab at first process', () => {
-      const proc1 = makeProcess({ name: 'alpha' });
-      const proc2 = makeProcess({ name: 'beta' });
+    it("wraps tab index on Shift+Tab at first process", () => {
+      const proc1 = makeProcess({ name: "alpha" });
+      const proc2 = makeProcess({ name: "beta" });
       const logs = new Map<string, LogEntry[]>([
-        ['alpha', [makeLog('Alpha log')]],
-        ['beta', [makeLog('Beta log')]],
+        ["alpha", [makeLog("Alpha log")]],
+        ["beta", [makeLog("Beta log")]],
       ]);
       const dialog = createDialog([proc1, proc2], logs);
 
@@ -409,15 +409,15 @@ describe('LogDialog', () => {
       dialog.handleInput(KEYS.shiftTab);
 
       dialog.render(80);
-      expect(theme.bold).toHaveBeenCalledWith('beta');
+      expect(theme.bold).toHaveBeenCalledWith("beta");
     });
 
-    it('resets selection on tab change', () => {
-      const proc1 = makeProcess({ name: 'alpha' });
-      const proc2 = makeProcess({ name: 'beta' });
+    it("resets selection on tab change", () => {
+      const proc1 = makeProcess({ name: "alpha" });
+      const proc2 = makeProcess({ name: "beta" });
       const logs = new Map<string, LogEntry[]>([
-        ['alpha', [makeLog('A1'), makeLog('A2'), makeLog('A3')]],
-        ['beta', [makeLog('B1'), makeLog('B2')]],
+        ["alpha", [makeLog("A1"), makeLog("A2"), makeLog("A3")]],
+        ["beta", [makeLog("B1"), makeLog("B2")]],
       ]);
       const dialog = createDialog([proc1, proc2], logs);
 
@@ -431,13 +431,13 @@ describe('LogDialog', () => {
 
       // Selection should be reset to index 0 on beta
       // The cursor "▶" should be on "B1"
-      expect(theme.bg).toHaveBeenCalledWith('toolPendingBg', expect.stringContaining('B1'));
+      expect(theme.bg).toHaveBeenCalledWith("toolPendingBg", expect.stringContaining("B1"));
     });
 
-    it('clamps selection at bottom boundary', () => {
-      const proc = makeProcess({ name: 'dev-server' });
-      const entries = [makeLog('Line 1'), makeLog('Line 2')];
-      const logs = new Map<string, LogEntry[]>([['dev-server', entries]]);
+    it("clamps selection at bottom boundary", () => {
+      const proc = makeProcess({ name: "dev-server" });
+      const entries = [makeLog("Line 1"), makeLog("Line 2")];
+      const logs = new Map<string, LogEntry[]>([["dev-server", entries]]);
       const dialog = createDialog([proc], logs);
 
       // Try to go past the last log
@@ -448,13 +448,13 @@ describe('LogDialog', () => {
       dialog.render(80);
 
       // Should still be on the last line
-      expect(theme.bg).toHaveBeenCalledWith('toolPendingBg', expect.stringContaining('Line 2'));
+      expect(theme.bg).toHaveBeenCalledWith("toolPendingBg", expect.stringContaining("Line 2"));
     });
 
-    it('clamps selection at top boundary', () => {
-      const proc = makeProcess({ name: 'dev-server' });
-      const entries = [makeLog('Line 1'), makeLog('Line 2')];
-      const logs = new Map<string, LogEntry[]>([['dev-server', entries]]);
+    it("clamps selection at top boundary", () => {
+      const proc = makeProcess({ name: "dev-server" });
+      const entries = [makeLog("Line 1"), makeLog("Line 2")];
+      const logs = new Map<string, LogEntry[]>([["dev-server", entries]]);
       const dialog = createDialog([proc], logs);
 
       // Try to go above the first log
@@ -462,12 +462,12 @@ describe('LogDialog', () => {
       dialog.render(80);
 
       // Should still be on the first line
-      expect(theme.bg).toHaveBeenCalledWith('toolPendingBg', expect.stringContaining('Line 1'));
+      expect(theme.bg).toHaveBeenCalledWith("toolPendingBg", expect.stringContaining("Line 1"));
     });
 
-    it('does not switch tab when only one process on Tab', () => {
-      const proc = makeProcess({ name: 'only' });
-      const logs = new Map<string, LogEntry[]>([['only', [makeLog('Log')]]]);
+    it("does not switch tab when only one process on Tab", () => {
+      const proc = makeProcess({ name: "only" });
+      const logs = new Map<string, LogEntry[]>([["only", [makeLog("Log")]]]);
       const dialog = createDialog([proc], logs);
 
       dialog.handleInput(KEYS.tab);
@@ -475,13 +475,13 @@ describe('LogDialog', () => {
 
       // Should still be on "only" (bold called for "only" only)
       const boldCalls = theme.bold.mock.calls.map((c) => c[0]);
-      expect(boldCalls).toEqual(['only']);
+      expect(boldCalls).toEqual(["only"]);
     });
 
-    it('clears multi-selection on plain navigation', () => {
-      const proc = makeProcess({ name: 'dev-server' });
-      const entries = [makeLog('Line 1'), makeLog('Line 2'), makeLog('Line 3')];
-      const logs = new Map<string, LogEntry[]>([['dev-server', entries]]);
+    it("clears multi-selection on plain navigation", () => {
+      const proc = makeProcess({ name: "dev-server" });
+      const entries = [makeLog("Line 1"), makeLog("Line 2"), makeLog("Line 3")];
+      const logs = new Map<string, LogEntry[]>([["dev-server", entries]]);
       const dialog = createDialog([proc], logs);
 
       // Start multi-select
@@ -492,13 +492,13 @@ describe('LogDialog', () => {
       dialog.render(80);
 
       // After clearing multi-select and moving to index 2, only Line 3 should be highlighted
-      const bgCalls = theme.bg.mock.calls.filter((c) => c[0] === 'toolPendingBg');
+      const bgCalls = theme.bg.mock.calls.filter((c) => c[0] === "toolPendingBg");
       // Only the last render pass matters — check that Line 3 is selected
-      expect(bgCalls.some((c) => c[1].includes('Line 3'))).toBe(true);
+      expect(bgCalls.some((c) => c[1].includes("Line 3"))).toBe(true);
     });
 
-    it('calls requestRender after handling input', () => {
-      const proc = makeProcess({ name: 'dev-server' });
+    it("calls requestRender after handling input", () => {
+      const proc = makeProcess({ name: "dev-server" });
       const dialog = createDialog([proc]);
 
       dialog.handleInput(KEYS.down);
@@ -508,9 +508,9 @@ describe('LogDialog', () => {
 
   // ── setRequestRender / setContentHeight / invalidate ──────────────────
 
-  describe('component interface', () => {
-    it('setRequestRender stores the callback', () => {
-      const proc = makeProcess({ name: 'dev-server' });
+  describe("component interface", () => {
+    it("setRequestRender stores the callback", () => {
+      const proc = makeProcess({ name: "dev-server" });
       const dialog = new LogDialog([proc], new Map(), theme, onDone);
       const myRender = vi.fn();
       dialog.setRequestRender(myRender);
@@ -520,15 +520,15 @@ describe('LogDialog', () => {
       expect(myRender).toHaveBeenCalled();
     });
 
-    it('invalidate() does not throw', () => {
+    it("invalidate() does not throw", () => {
       const dialog = createDialog();
-      expect(() => dialog.invalidate()).not.toThrow();
+      expect(() => { dialog.invalidate(); }).not.toThrow();
     });
 
-    it('setContentHeight adjusts viewport', () => {
-      const proc = makeProcess({ name: 'dev-server' });
+    it("setContentHeight adjusts viewport", () => {
+      const proc = makeProcess({ name: "dev-server" });
       const entries = makeLogs(50);
-      const logs = new Map<string, LogEntry[]>([['dev-server', entries]]);
+      const logs = new Map<string, LogEntry[]>([["dev-server", entries]]);
       const dialog = createDialog([proc], logs);
 
       // Set a small content height
@@ -543,7 +543,7 @@ describe('LogDialog', () => {
 
       // With viewport of 3, there should be a scroll indicator
       const hasScrollIndicator = lines.some(
-        (l) => l.includes('more above') || l.includes('more below'),
+        (l) => l.includes("more above") || l.includes("more below"),
       );
       expect(hasScrollIndicator).toBe(true);
     });
@@ -551,34 +551,34 @@ describe('LogDialog', () => {
 
   // ── Diagnostics ──────────────────────────────────────────────────────
 
-  describe('diagnostics', () => {
+  describe("diagnostics", () => {
     it("shows 'No process selected' when no processes", () => {
       const dialog = createDialog();
       const lines = dialog.render(80);
 
-      expect(lines.some((l) => l.includes('No process selected'))).toBe(true);
+      expect(lines.some((l) => l.includes("No process selected"))).toBe(true);
     });
 
-    it('shows viewport range when logs are present', () => {
-      const proc = makeProcess({ name: 'dev-server' });
+    it("shows viewport range when logs are present", () => {
+      const proc = makeProcess({ name: "dev-server" });
       const entries = makeLogs(10);
-      const logs = new Map<string, LogEntry[]>([['dev-server', entries]]);
+      const logs = new Map<string, LogEntry[]>([["dev-server", entries]]);
       const dialog = createDialog([proc], logs);
 
       // Use wide width so mock theme tags don't cause truncation
       const lines = dialog.render(200);
 
       // With viewport of 20 and 10 logs, should show "showing 1-10 of 10"
-      expect(lines.some((l) => l.includes('showing') && l.includes('of 10'))).toBe(true);
+      expect(lines.some((l) => l.includes("showing") && l.includes("of 10"))).toBe(true);
     });
 
-    it('shows running/exited status in diagnostics', () => {
-      const proc = makeProcess({ name: 'dev-server', running: true });
+    it("shows running/exited status in diagnostics", () => {
+      const proc = makeProcess({ name: "dev-server", running: true });
       const dialog = createDialog([proc]);
       // Use wide width so mock theme tags don't cause truncation
       const lines = dialog.render(200);
 
-      expect(lines.some((l) => l.includes('status: running'))).toBe(true);
+      expect(lines.some((l) => l.includes("status: running"))).toBe(true);
     });
   });
 });

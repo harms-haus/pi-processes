@@ -1,19 +1,19 @@
-import { vi } from 'vitest';
-import type { ProcessManager } from '../../process-manager.js';
-import type { KillResult, LogEntry, ProcessInfo, StartupResult } from '../../types.js';
+import { vi } from "vitest";
+import type { ProcessManager } from "../../process-manager.js";
+import type { KillResult, LogEntry, ProcessInfo, StartupResult } from "../../types.js";
 
 /** Default mock StartupResult used by createMockManager */
 export const defaultStartupResult: StartupResult = {
-  name: 'dev-server',
+  name: "dev-server",
   pid: 12345,
   startupTime: 3200,
   maxDelay: 2,
-  logs: 'Server listening on port 3000\nReady.',
+  logs: "Server listening on port 3000\nReady.",
 };
 
 /** Default mock KillResult used by createMockManager */
 export const defaultKillResult: KillResult = {
-  name: 'my-server',
+  name: "my-server",
   pid: 12345,
   totalRuntime: 5432,
 };
@@ -36,14 +36,14 @@ export const defaultKillResult: KillResult = {
  */
 export function createMockManager(
   overrides?: Partial<{
-    start: ProcessManager['start'];
-    kill: ProcessManager['kill'];
-    restart: ProcessManager['restart'];
-    list: ProcessManager['list'];
-    getLogs: ProcessManager['getLogs'];
-    has: ProcessManager['has'];
-    shutdown: ProcessManager['shutdown'];
-    onProcessCountChange: ProcessManager['onProcessCountChange'];
+    start: ProcessManager["start"];
+    kill: ProcessManager["kill"];
+    restart: ProcessManager["restart"];
+    list: ProcessManager["list"];
+    getLogs: ProcessManager["getLogs"];
+    has: ProcessManager["has"];
+    shutdown: ProcessManager["shutdown"];
+    onProcessCountChange: ProcessManager["onProcessCountChange"];
     size: number;
   }>,
 ) {
@@ -72,7 +72,7 @@ export function createMockManager(
     restart.mockImplementation(overrides.restart as any);
   }
   if (overrides?.list) {
-    list.mockImplementation(overrides.list as any);
+    list.mockImplementation(overrides.list);
   }
   if (overrides?.getLogs) {
     getLogs.mockImplementation(overrides.getLogs as any);
@@ -81,7 +81,7 @@ export function createMockManager(
     has.mockImplementation(overrides.has as any);
   }
   if (overrides?.shutdown) {
-    shutdown.mockImplementation(overrides.shutdown as any);
+    shutdown.mockImplementation(overrides.shutdown);
   }
   if (overrides?.onProcessCountChange) {
     onProcessCountChange.mockImplementation(overrides.onProcessCountChange);

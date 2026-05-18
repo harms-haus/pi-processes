@@ -1,4 +1,4 @@
-import type { LogEntry } from './types.js';
+import type { LogEntry } from "./types.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -32,11 +32,101 @@ interface LogQueryResult {
 
 /** Escape special regex metacharacters in a string for use in RegExp constructor */
 function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function formatLine(entry: LogEntry, lineNum: number): string {
   return `[${lineNum}] +${entry.timestamp}ms [${entry.stream}] ${entry.text}`;
+}
+
+/** Validate that option combinations are legal, throwing on conflicts. */
+function validateOptions(options: LogQueryOptions): void {
+  const { head, tail, start, end } = options;
+  const hasHead = head !== undefined;
+  const hasTail = tail !== undefined;
+  const hasStart = start !== undefined;
+  const hasEnd = end !== undefined;
+
+  const conflicts: [boolean, boolean, string][] = [
+    [hasHead, hasTail, "Cannot specify both head and tail"],
+    [hasHead, hasStart, "Cannot specify both head and start"],
+    [hasHead, hasEnd, "Cannot specify both head and end"],
+    [hasTail, hasStart, "Cannot specify both tail and start"],
+    [hasTail, hasEnd, "Cannot specify both tail and end"],
+  ];
+  for (const [a, b, msg] of conflicts) {
+    if (a && b) throw new Error(msg);
+  }
+
+  if (hasStart && start < 1) {
+    throw new Error("start must be >= 1");
+  }
+  if (hasStart && hasEnd && end < start) {
+    throw new Error("end must be >= start");
+  }
+}
+
+/** Filter log entries by grep pattern if provided, otherwise return all. */
+function filterByGrep(
+  logs: LogEntry[],
+  grep: string | undefined,
+  grepLiteral: boolean | undefined,
+  grepIgnoreCase: boolean | undefined,
+): Array<{ entry: LogEntry; originalIndex: number }> {
+  if (!grep) {
+    return logs.map((entry, originalIndex) => ({ entry, originalIndex }));
+  }
+  const flags = grepIgnoreCase ? "i" : "";
+  let regex: RegExp;
+  try {
+    regex = grepLiteral
+      ? new RegExp(escapeRegex(grep), flags)
+      : new RegExp(grep, flags);
+  } catch {
+    throw new Error(`Invalid regex pattern: "${grep}"`);
+  }
+  const result: Array<{ entry: LogEntry; originalIndex: number }> = [];
+  for (let i = 0; i < logs.length; i++) {
+    if (regex.test(logs[i].text)) {
+      result.push({ entry: logs[i], originalIndex: i });
+    }
+  }
+  return result;
+}
+
+/** Compute the [sliceStart, sliceEnd) range on the filtered array. */
+function computeSliceRange(
+  filteredCount: number,
+  options: LogQueryOptions,
+): [number, number] {
+  const { head, tail, start, end } = options;
+  const hasHead = head !== undefined;
+  const hasTail = tail !== undefined;
+  const hasStart = start !== undefined;
+  const hasEnd = end !== undefined;
+
+  if (hasHead) {
+    return [0, Math.min(head, filteredCount)];
+  }
+  if (hasTail) {
+    const count = Math.min(tail, filteredCount);
+    return [filteredCount - count, filteredCount];
+  }
+  if (hasStart || hasEnd) {
+    let sliceStart = hasStart ? start - 1 : 0;
+    let sliceEnd = hasEnd ? Math.min(end, filteredCount) : filteredCount;
+    sliceStart = Math.max(sliceStart, 0);
+    if (sliceStart >= filteredCount) {
+      sliceStart = filteredCount;
+      sliceEnd = filteredCount;
+    }
+    if (sliceEnd < sliceStart) {
+      sliceEnd = sliceStart;
+    }
+    return [sliceStart, sliceEnd];
+  }
+  // No options → return all
+  return [0, filteredCount];
 }
 
 // ── Public API ──────────────────────────────────────────────────────────────
@@ -49,90 +139,18 @@ function formatLine(entry: LogEntry, lineNum: number): string {
  */
 export function queryLogs(logs: LogEntry[], options: LogQueryOptions): LogQueryResult {
   const totalLines = logs.length;
-  const { head, tail, start, end, grep, grepLiteral, grepIgnoreCase } = options;
 
-  const hasHead = head !== undefined;
-  const hasTail = tail !== undefined;
-  const hasStart = start !== undefined;
-  const hasEnd = end !== undefined;
+  validateOptions(options);
 
-  // Validate option combinations
-  if (hasHead && hasTail) {
-    throw new Error('Cannot specify both head and tail');
-  }
-  if (hasHead && hasStart) {
-    throw new Error('Cannot specify both head and start');
-  }
-  if (hasHead && hasEnd) {
-    throw new Error('Cannot specify both head and end');
-  }
-  if (hasTail && hasStart) {
-    throw new Error('Cannot specify both tail and start');
-  }
-  if (hasTail && hasEnd) {
-    throw new Error('Cannot specify both tail and end');
-  }
-
-  // Validate start/end values
-  if (hasStart && start < 1) {
-    throw new Error('start must be >= 1');
-  }
-  if (hasStart && hasEnd && end < start) {
-    throw new Error('end must be >= start');
-  }
-
-  // If grep is provided, filter entries first (before positional slicing)
-  let filteredLogs: Array<{ entry: LogEntry; originalIndex: number }>;
-  if (grep) {
-    const flags = grepIgnoreCase ? 'i' : '';
-    let regex: RegExp;
-    try {
-      regex = grepLiteral ? new RegExp(escapeRegex(grep), flags) : new RegExp(grep, flags);
-    } catch {
-      throw new Error(`Invalid regex pattern: "${grep}"`);
-    }
-    filteredLogs = [];
-    for (let i = 0; i < logs.length; i++) {
-      if (regex.test(logs[i].text)) {
-        filteredLogs.push({ entry: logs[i], originalIndex: i });
-      }
-    }
-  } else {
-    filteredLogs = logs.map((entry, originalIndex) => ({
-      entry,
-      originalIndex,
-    }));
-  }
-
+  const filteredLogs = filterByGrep(
+    logs,
+    options.grep,
+    options.grepLiteral,
+    options.grepIgnoreCase,
+  );
   const filteredCount = filteredLogs.length;
 
-  // Determine slice range (0-indexed, end exclusive) on filtered array
-  let sliceStart = 0;
-  let sliceEnd = filteredCount;
-
-  if (hasHead) {
-    sliceEnd = Math.min(head, filteredCount);
-  } else if (hasTail) {
-    const count = Math.min(tail, filteredCount);
-    sliceStart = filteredCount - count;
-  } else if (hasStart || hasEnd) {
-    if (hasStart) {
-      sliceStart = start - 1; // convert 1-indexed to 0-indexed
-    }
-    if (hasEnd) {
-      sliceEnd = Math.min(end, filteredCount);
-    }
-    // Clamp
-    sliceStart = Math.max(sliceStart, 0);
-    if (sliceStart >= filteredCount) {
-      sliceStart = filteredCount;
-      sliceEnd = filteredCount;
-    }
-    if (sliceEnd < sliceStart) {
-      sliceEnd = sliceStart;
-    }
-  }
-  // else: no options → return all (sliceStart=0, sliceEnd=filteredCount)
+  const [sliceStart, sliceEnd] = computeSliceRange(filteredCount, options);
 
   const count = sliceEnd - sliceStart;
   const parts = new Array<string>(count);
@@ -142,7 +160,7 @@ export function queryLogs(logs: LogEntry[], options: LogQueryOptions): LogQueryR
   }
 
   return {
-    text: parts.join('\n'),
+    text: parts.join("\n"),
     totalLines,
     returnedLines: count,
   };
