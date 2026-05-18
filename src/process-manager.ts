@@ -79,7 +79,9 @@ export class ProcessManager {
     this.emitProcessCount();
 
     const addLog = this.createAddLog(record);
-    const resetDebounce = () => { this.resetDebounce(record, startDelay); };
+    const resetDebounce = () => {
+      this.resetDebounce(record, startDelay);
+    };
 
     this.setupStreamHandler(childProcess, "stdout", addLog, resetDebounce);
     this.setupStreamHandler(childProcess, "stderr", addLog, resetDebounce);

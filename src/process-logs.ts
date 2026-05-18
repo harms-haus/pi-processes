@@ -79,9 +79,7 @@ function filterByGrep(
   const flags = grepIgnoreCase ? "i" : "";
   let regex: RegExp;
   try {
-    regex = grepLiteral
-      ? new RegExp(escapeRegex(grep), flags)
-      : new RegExp(grep, flags);
+    regex = grepLiteral ? new RegExp(escapeRegex(grep), flags) : new RegExp(grep, flags);
   } catch {
     throw new Error(`Invalid regex pattern: "${grep}"`);
   }
@@ -95,10 +93,7 @@ function filterByGrep(
 }
 
 /** Compute the [sliceStart, sliceEnd) range on the filtered array. */
-function computeSliceRange(
-  filteredCount: number,
-  options: LogQueryOptions,
-): [number, number] {
+function computeSliceRange(filteredCount: number, options: LogQueryOptions): [number, number] {
   const { head, tail, start, end } = options;
   const hasHead = head !== undefined;
   const hasTail = tail !== undefined;

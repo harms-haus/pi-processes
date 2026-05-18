@@ -101,7 +101,9 @@ export default function (pi: ExtensionAPI) {
       } | null>(
         (tui, theme, _keybindings, done) => {
           const dialog = new LogDialog(processes, logsByProcess, theme as ThemeStyle, done);
-          dialog.setRequestRender(() => { tui.requestRender(); });
+          dialog.setRequestRender(() => {
+            tui.requestRender();
+          });
           return dialog;
         },
         {

@@ -522,7 +522,9 @@ describe("LogDialog", () => {
 
     it("invalidate() does not throw", () => {
       const dialog = createDialog();
-      expect(() => { dialog.invalidate(); }).not.toThrow();
+      expect(() => {
+        dialog.invalidate();
+      }).not.toThrow();
     });
 
     it("setContentHeight adjusts viewport", () => {
