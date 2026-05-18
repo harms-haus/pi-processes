@@ -3,6 +3,7 @@ import tseslint from "typescript-eslint";
 import importPlugin from "eslint-plugin-import-x";
 import unicorn from "eslint-plugin-unicorn";
 import { fixupPluginRules } from "@eslint/compat";
+import prettierConfig from "eslint-config-prettier";
 
 export default tseslint.config(
 	{ ignores: ["dist/**", "node_modules/**", "**/*.js", "**/*.cjs", "**/*.mjs"] },
@@ -51,4 +52,5 @@ export default tseslint.config(
 			"unicorn/consistent-function-scoping": "off",
 		},
 	},
+	prettierConfig,
 );

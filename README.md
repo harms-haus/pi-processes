@@ -385,19 +385,16 @@ restart_process(name="api")               // restart after config change
 
 ### Scripts
 
-```bash
-# Type-check
-npm run typecheck
-
-# Lint
-npm run lint
-
-# Run tests once
-npm run test
-
-# Run tests in watch mode
-npm run test:watch
-```
+| Script                 | Description                                |
+|------------------------|--------------------------------------------|
+| `npm run typecheck`    | Type-check with `tsc --noEmit`             |
+| `npm run lint`         | Lint with ESLint                           |
+| `npm run lint:fix`     | Auto-fix ESLint issues                     |
+| `npm run format`       | Format code with Prettier                  |
+| `npm run format:check` | Check formatting (CI)                      |
+| `npm run test`         | Run tests once (Vitest)                    |
+| `npm run test:watch`   | Run tests in watch mode                    |
+| `npm run test:coverage`| Run tests with v8 coverage (90% thresholds)|
 
 ### Project Structure
 
@@ -408,7 +405,6 @@ src/
 ├── process-manager.ts    # Core process management
 ├── process-logs.ts       # Log query helper
 ├── ui/                   # TUI components
-│   ├── index.ts          # Barrel export
 │   ├── format-timestamp.ts # Timestamp formatting
 │   └── log-dialog.ts     # Process logs dialog
 ├── tools/                # Tool definitions
@@ -430,6 +426,7 @@ src/
     │   └── make-logs.ts
     ├── tools/
     │   ├── error-propagation.test.ts
+    │   ├── format-startup-result.test.ts
     │   ├── start-process.test.ts
     │   ├── kill-process.test.ts
     │   ├── list-processes.test.ts
@@ -448,13 +445,19 @@ Tests are written with [Vitest](https://vitest.dev/) and organized in `src/__tes
 npm run test
 ```
 
-### Linting
+### Linting & Formatting
 
-[Biome](https://biomejs.dev/) is used for linting and formatting:
+Linting is handled by [ESLint](https://eslint.org/) with [typescript-eslint](https://typescript-eslint.io/), [eslint-plugin-import-x](https://github.com/un-ts/eslint-plugin-import-x), and [eslint-plugin-unicorn](https://github.com/sindresorhus/eslint-plugin-unicorn). Formatting is handled by [Prettier](https://prettier.io/) with [`eslint-config-prettier`](https://github.com/prettier/eslint-config-prettier) to disable conflicting ESLint rules.
 
 ```bash
-npm run lint
+npm run lint          # check for issues
+npm run format        # auto-format
+npm run format:check  # CI-friendly format check
 ```
+
+## Publishing
+
+The package is published to npm via a tag-based dry-run workflow (`.github/workflows/publish.yml`). The `engines` field in `package.json` requires Node ≥ 20, and `.nvmrc` pins the development environment to Node 20.
 
 ## Dependencies
 

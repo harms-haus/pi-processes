@@ -6,16 +6,13 @@
  * @returns Formatted string like "00:01:23.456"
  */
 export function formatTimestamp(ms: number): string {
-	const totalSeconds = Math.floor(ms / 1000);
-	const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
-	const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(
-		2,
-		"0",
-	);
-	const seconds = String(totalSeconds % 60).padStart(2, "0");
-	const millis = String(ms % 1000).padStart(3, "0");
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+  const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+  const seconds = String(totalSeconds % 60).padStart(2, '0');
+  const millis = String(ms % 1000).padStart(3, '0');
 
-	return `${hours}:${minutes}:${seconds}.${millis}`;
+  return `${hours}:${minutes}:${seconds}.${millis}`;
 }
 
 /**
@@ -26,5 +23,5 @@ export function formatTimestamp(ms: number): string {
  * @returns Formatted string like "+00:01:23.456"
  */
 export function formatLogTimestamp(ms: number): string {
-	return `+${formatTimestamp(ms)}`;
+  return `+${formatTimestamp(ms)}`;
 }
