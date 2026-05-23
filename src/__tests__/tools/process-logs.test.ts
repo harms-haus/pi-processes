@@ -233,6 +233,31 @@ describe("createProcessLogsTool", () => {
     expect((result.content[0] as { type: "text"; text: string }).text).toBe("(no logs)");
   });
 
+  // ── Log offset integration tests ────────────────────────────────────────
+
+  it("execute passes logOffset to queryLogs for correct line numbering", async () => {
+    const offsetLogs = makeLogs(5);
+    const manager = createMockManager({
+      getLogs: vi.fn().mockReturnValue(offsetLogs),
+      getLogOffset: vi.fn().mockReturnValue(10),
+    });
+    const tool = createProcessLogsTool(() => manager as any);
+
+    const result = await executeTool(tool, "call-offset", {
+      name: "test-proc",
+      head: 3,
+    });
+
+    expect(manager.getLogs).toHaveBeenCalledWith("test-proc");
+    expect(manager.getLogOffset).toHaveBeenCalledWith("test-proc");
+    const text = (result.content[0] as { type: "text"; text: string }).text;
+    expect(text).toContain("[11]");
+    expect(text).toContain("[12]");
+    expect(text).toContain("[13]");
+    expect(text).not.toContain("[1]");
+    expect(text).not.toContain("[14]");
+  });
+
   // ── Grep pass-through tests ─────────────────────────────────────────────
 
   // 1. execute passes grep to queryLogs
@@ -342,5 +367,26 @@ describe("createProcessLogsTool", () => {
     const str = renderToString(component);
     expect(str).toContain('grep("warn")');
     expect(str).toContain("tail(10)");
+  });
+
+  // 7. renderCall shows grep-only mode (grep with no positional specifier)
+  it("renderCall shows grep-only mode without positional specifier", () => {
+    const tool = createProcessLogsTool(() => mockManager([]));
+    const theme = createMockTheme();
+
+    const component = tool.renderCall!(
+      { name: "myapp", grep: "error" },
+      theme as any,
+      undefined as any,
+    );
+
+    const str = renderToString(component);
+    expect(str).toContain("process_logs");
+    expect(str).toContain("myapp");
+    expect(str).toContain('grep("error")');
+    // Should NOT contain "all" or any positional mode labels
+    expect(str).not.toContain("all");
+    expect(str).not.toContain("head(");
+    expect(str).not.toContain("tail(");
   });
 });

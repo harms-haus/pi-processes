@@ -25,7 +25,9 @@ export function createProcessLogsTool(
     ],
     parameters: ProcessLogsSchema,
     execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
-      const logs = getManager().getLogs(params.name);
+      const manager = getManager();
+      const logs = manager.getLogs(params.name);
+      const logOffset = manager.getLogOffset(params.name);
       const queryOptions: LogQueryOptions = {};
       if (params.head !== undefined) {
         queryOptions.head = params.head;
@@ -49,7 +51,7 @@ export function createProcessLogsTool(
         queryOptions.grepIgnoreCase = params.grepIgnoreCase;
       }
 
-      const result = queryLogs(logs, queryOptions);
+      const result = queryLogs(logs, queryOptions, logOffset);
       return Promise.resolve({
         content: [{ type: "text", text: result.text || "(no logs)" }],
         details: {

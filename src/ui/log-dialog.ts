@@ -12,6 +12,7 @@ export class LogDialog {
   private selectionAnchor: number | null = null;
   private viewportOffset: number = 0;
   private requestRenderFn?: () => void;
+  /** Set by the TUI framework or tests to control the log viewport height. Defaults to 20 lines. */
   private contentHeight: number = 20;
 
   constructor(
@@ -343,6 +344,7 @@ export class LogDialog {
 
   // ── Component Interface ──────────────────────────────────────────────
 
+  /** Framework interface contract. No-op — nothing to invalidate since we render on demand. */
   invalidate(): void {
     // Clear any cached render state — nothing to cache for now
   }

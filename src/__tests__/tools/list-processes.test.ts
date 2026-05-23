@@ -90,6 +90,23 @@ describe("createListProcessesTool", () => {
     });
   });
 
+  describe("renderCall()", () => {
+    it("returns a Text component with tool title", () => {
+      const manager = createMockManager();
+      const tool = createListProcessesTool(() => manager as any);
+      const theme = createMockTheme();
+
+      const component = tool.renderCall!({}, theme as any, undefined as any);
+
+      // Should be a Text instance
+      expect(component.constructor.name).toBe("Text");
+
+      // theme.fg should be called with "toolTitle" and bolded label
+      expect(theme.bold).toHaveBeenCalledWith("list_processes");
+      expect(theme.fg).toHaveBeenCalledWith("toolTitle", "**list_processes**");
+    });
+  });
+
   describe("renderResult()", () => {
     it("shows process count", () => {
       const manager = createMockManager();

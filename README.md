@@ -134,7 +134,7 @@ watcher    (PID 12350) | npx tsc --watch | uptime: 340.5s | 42 lines | starting
 
 ### `kill_process`
 
-Terminate a managed process by name. Sends `SIGTERM` first, then `SIGKILL` after 5 seconds if the process hasn't exited.
+Terminate a managed process by name. Sends `SIGTERM` first, then `SIGKILL` after 5 seconds if the process hasn't exited. If the process has already exited naturally, calling `kill_process` simply removes its record from the manager (no signals are sent).
 
 | Parameter | Type   | Required | Default | Description              |
 |-----------|--------|----------|---------|--------------------------|
@@ -342,8 +342,9 @@ restart_process(name="api")               // restart after config change
 │  kill() ─────────────┼───►│  restart_…  │    │
 │  list()              │    └─────────────┘    │
 │  getLogs()           │                        │
-│  restart()           │    ┌──────────────────┐│
-│  shutdown()          │    │  process-logs.ts ││
+│  getLogOffset()      │    ┌──────────────────┐│
+│  restart()           │    │  process-logs.ts ││
+│  shutdown()          │    │  (queryLogs)     ││
 │                      │    │  (queryLogs)     ││
 └──────────┬───────────┘    └──────────────────┘│
            │                                     │
@@ -364,6 +365,7 @@ restart_process(name="api")               // restart after config change
 2. **Tool call** (`start_process`) → `spawn()` creates a child process with piped stdio.
 3. **Startup debounce** → each stdout/stderr chunk resets a timer. When output goes quiet for `start_delay` seconds, the tool resolves with boot logs.
 4. **Log capture** → lines are appended to an in-memory log buffer (max 10 000 entries). Both stdout and stderr are captured identically; oldest lines are evicted via Array.shift() when the limit is reached.
+   Line numbers are **stable across eviction**. When the buffer exceeds `MAX_LOG_ENTRIES`, the oldest entries are discarded, but displayed line numbers reflect the absolute position since process start. For example, after 15 000 lines have been produced, `head=10` would show lines `[5001]`–`[5010]`.
 5. **Kill** → `SIGTERM` is sent. If the process hasn't exited within 5 seconds, `SIGKILL` is sent.
 6. **Session shutdown** → all managed processes are killed and the manager is cleared.
 
@@ -375,6 +377,8 @@ restart_process(name="api")               // restart after config change
 | `MAX_PROCESSES`        | `50`          | Maximum concurrent managed processes.              |
 | `MAX_LOG_ENTRIES`      | `10 000`      | Max log lines retained per process (FIFO eviction).|
 | `SIGKILL_DELAY_MS`     | `5000` ms     | Grace period after SIGTERM before SIGKILL.         |
+| `MAX_LOG_LINE_BYTES`   | `8192`        | Maximum byte length for a single log line. Lines exceeding this are truncated with `...` suffix. |
+| `KILL_FORCE_RESOLVE_MS`| `5000` ms     | Grace period after SIGKILL before force-resolving the kill promise for uninterruptible processes. |
 
 ## Development
 
@@ -406,7 +410,8 @@ src/
 ├── process-logs.ts       # Log query helper
 ├── ui/                   # TUI components
 │   ├── format-timestamp.ts # Timestamp formatting
-│   └── log-dialog.ts     # Process logs dialog
+│   ├── log-dialog.ts     # Process logs dialog
+│   └── open-log-dialog.ts # Overlay factory & dialog opener
 ├── tools/                # Tool definitions
 │   ├── start-process.ts
 │   ├── list-processes.ts
@@ -447,7 +452,7 @@ npm run test
 
 ### Linting & Formatting
 
-Linting is handled by [ESLint](https://eslint.org/) with [typescript-eslint](https://typescript-eslint.io/), [eslint-plugin-import-x](https://github.com/un-ts/eslint-plugin-import-x), and [eslint-plugin-unicorn](https://github.com/sindresorhus/eslint-plugin-unicorn). Formatting is handled by [Prettier](https://prettier.io/) with [`eslint-config-prettier`](https://github.com/prettier/eslint-config-prettier) to disable conflicting ESLint rules.
+Linting is handled by [ESLint](https://eslint.org/) with [typescript-eslint](https://typescript-eslint.io/) and [eslint-config-prettier](https://github.com/prettier/eslint-config-prettier). Formatting is handled by [Prettier](https://prettier.io/).
 
 ```bash
 npm run lint          # check for issues
@@ -467,6 +472,7 @@ The extension depends on [`@earendil-works/pi-coding-agent`](https://github.com/
 
 - **Exited processes remain in memory**: Processes that exit naturally are retained in the internal Map (with their logs) until explicitly killed via `kill_process` or `shutdown`. This is intentional to allow log inspection after exit. The Map is capped at 50 processes.
 - **Log eviction uses Array.shift()**: The log ring buffer uses `Array.shift()` for eviction when MAX_LOG_ENTRIES is reached, which is O(n) per eviction. For extremely high-throughput processes producing thousands of log lines, this may cause GC pressure.
+- **Log line truncation**: Individual log lines exceeding 8,192 bytes (`MAX_LOG_LINE_BYTES`) are truncated to prevent unbounded memory growth. Truncated lines are suffixed with `...`.
 
 ## License
 

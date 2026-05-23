@@ -5,7 +5,9 @@
  * @param ms - Duration in milliseconds (must be >= 0)
  * @returns Formatted string like "00:01:23.456"
  */
+/** @internal Exported for testing. Use formatLogTimestamp() for public usage. */
 export function formatTimestamp(ms: number): string {
+  if (ms < 0) ms = 0;
   const totalSeconds = Math.floor(ms / 1000);
   const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
   const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");

@@ -30,8 +30,8 @@ export interface LogEntry {
 export interface ProcessRecord {
   /** Unique name for this process */
   name: string;
-  /** The spawned ChildProcess */
-  process: ChildProcess;
+  /** The spawned ChildProcess (null after exit cleanup) */
+  process: ChildProcess | null;
   /** OS process ID */
   pid: number;
   /** The command string used to spawn */
@@ -56,6 +56,14 @@ export interface ProcessRecord {
   lastLogTime: number;
   /** Whether kill() is in progress for this process */
   killing?: boolean;
+  /** Timestamp when the process exited, null while running */
+  exitTime: number | null;
+  /** Number of lines discarded from the front of the log buffer */
+  logOffset: number;
+  /** Buffered partial stdout line across chunks */
+  pendingStdout: string;
+  /** Buffered partial stderr line across chunks */
+  pendingStderr: string;
 }
 
 // ── Result Types ────────────────────────────────────────────────────────────
@@ -132,6 +140,9 @@ export const MAX_PROCESSES = 50;
 
 /** Maximum number of log entries retained per process */
 export const MAX_LOG_ENTRIES = 10000;
+
+/** Maximum byte length for a single log line */
+export const MAX_LOG_LINE_BYTES = 8192;
 
 // ── Tool Parameter Schemas (TypeBox) ────────────────────────────────────────
 

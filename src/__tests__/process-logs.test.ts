@@ -345,4 +345,47 @@ describe("queryLogs", () => {
       'Invalid regex pattern: "[invalid"',
     );
   });
+
+  // ── logOffset tests ──────────────────────────────────────────────────
+
+  it("logOffset=5 with head=3 shows line numbers [6], [7], [8]", () => {
+    const logs = makeLogs(10);
+    const result = queryLogs(logs, { head: 3 }, 5);
+
+    expect(result.totalLines).toBe(10);
+    expect(result.returnedLines).toBe(3);
+    expect(result.text).toContain("[6]");
+    expect(result.text).toContain("[7]");
+    expect(result.text).toContain("[8]");
+    expect(result.text).not.toContain("[1]");
+    expect(result.text).not.toContain("[5]");
+    expect(result.text).not.toContain("[9]");
+  });
+
+  it("logOffset=0 preserves existing line numbers (regression check)", () => {
+    const logs = makeLogs(5);
+    const result = queryLogs(logs, { head: 3 }, 0);
+
+    expect(result.returnedLines).toBe(3);
+    expect(result.text).toContain("[1]");
+    expect(result.text).toContain("[2]");
+    expect(result.text).toContain("[3]");
+    expect(result.text).not.toContain("[4]");
+    expect(result.text).not.toContain("[5]");
+  });
+
+  it("logOffset=3 with grep matching some lines offsets line numbers correctly", () => {
+    const logs = makeLogs(10);
+    // grep matches lines 2, 5, 7 → with offset=3 becomes [5], [8], [10]
+    const result = queryLogs(logs, { grep: "Line [257]" }, 3);
+
+    expect(result.totalLines).toBe(10);
+    expect(result.returnedLines).toBe(3);
+    expect(result.text).toContain("[5]");
+    expect(result.text).toContain("[8]");
+    expect(result.text).toContain("[10]");
+    // Original line numbers without offset should not appear
+    expect(result.text).not.toContain("[2]");
+    expect(result.text).not.toContain("[7]");
+  });
 });

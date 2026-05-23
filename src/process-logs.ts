@@ -130,9 +130,14 @@ function computeSliceRange(filteredCount: number, options: LogQueryOptions): [nu
  * Query log entries from a process's log buffer.
  * @param logs - Array of LogEntry objects
  * @param options - Query mode (head/tail/start+end)
+ * @param logOffset - Number of lines evicted from the front of the log buffer. Used to offset displayed line numbers for stable absolute numbering. Defaults to 0.
  * @returns Formatted log text and metadata
  */
-export function queryLogs(logs: LogEntry[], options: LogQueryOptions): LogQueryResult {
+export function queryLogs(
+  logs: LogEntry[],
+  options: LogQueryOptions,
+  logOffset = 0,
+): LogQueryResult {
   const totalLines = logs.length;
 
   validateOptions(options);
@@ -151,7 +156,7 @@ export function queryLogs(logs: LogEntry[], options: LogQueryOptions): LogQueryR
   const parts = new Array<string>(count);
   for (let i = 0; i < count; i++) {
     const { entry, originalIndex } = filteredLogs[sliceStart + i];
-    parts[i] = formatLine(entry, originalIndex + 1);
+    parts[i] = formatLine(entry, originalIndex + 1 + logOffset);
   }
 
   return {

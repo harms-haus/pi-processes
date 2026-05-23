@@ -16,10 +16,11 @@ import { createListProcessesTool } from "./tools/list-processes.js";
 import { createProcessLogsTool } from "./tools/process-logs.js";
 import { createRestartProcessTool } from "./tools/restart-process.js";
 import { createStartProcessTool } from "./tools/start-process.js";
-import { formatLogTimestamp } from "./ui/format-timestamp.js";
-import { LogDialog } from "./ui/log-dialog.js";
-import type { LogEntry, ThemeStyle } from "./types.js";
+import { openLogDialog } from "./ui/open-log-dialog.js";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+
+// Re-export createLogDialogOverlay for backward compatibility
+export { createLogDialogOverlay } from "./ui/open-log-dialog.js";
 
 export default function (pi: ExtensionAPI) {
   let manager: ProcessManager | null = null;
@@ -75,59 +76,9 @@ export default function (pi: ExtensionAPI) {
   pi.registerShortcut(Key.ctrlAlt("p"), {
     description: "Show process logs dialog",
     handler: async (ctx) => {
-      if (!ctx.hasUI) {
-        return;
-      }
       const mgr = manager;
-      if (!mgr) {
-        return;
-      }
-
-      const processes = mgr.list();
-      if (processes.length === 0) {
-        ctx.ui.notify("No processes running. Start one first.", "info");
-        return;
-      }
-
-      // Collect logs for all processes
-      const logsByProcess = new Map<string, LogEntry[]>();
-      for (const proc of processes) {
-        logsByProcess.set(proc.name, mgr.getLogs(proc.name));
-      }
-
-      const result = await ctx.ui.custom<{
-        selectedLogs: LogEntry[];
-        processName: string;
-      } | null>(
-        (tui, theme, _keybindings, done) => {
-          const dialog = new LogDialog(processes, logsByProcess, theme as ThemeStyle, done);
-          dialog.setRequestRender(() => {
-            tui.requestRender();
-          });
-          return dialog;
-        },
-        {
-          overlay: true,
-          overlayOptions: {
-            anchor: "center",
-            width: "66%",
-            maxHeight: "66%",
-          },
-        },
-      );
-
-      if (result) {
-        const formatted = result.selectedLogs
-          .map(
-            (entry) => `[${formatLogTimestamp(entry.timestamp)}] [${entry.stream}] ${entry.text}`,
-          )
-          .join("\n");
-        ctx.ui.setEditorText(formatted);
-        ctx.ui.notify(
-          `Inserted ${result.selectedLogs.length} log lines from ${result.processName}`,
-          "info",
-        );
-      }
+      if (!mgr) return;
+      await openLogDialog(ctx, mgr);
     },
   });
 }

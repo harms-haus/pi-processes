@@ -27,6 +27,7 @@ export const defaultKillResult: KillResult = {
  * - restart → resolves with defaultStartupResult
  * - list → returns []
  * - getLogs → returns []
+ * - getLogOffset → returns 0
  * - has → returns false
  * - size → returns 0
  * - shutdown → resolve undefined
@@ -41,6 +42,7 @@ export function createMockManager(
     restart: ProcessManager["restart"];
     list: ProcessManager["list"];
     getLogs: ProcessManager["getLogs"];
+    getLogOffset: ProcessManager["getLogOffset"];
     has: ProcessManager["has"];
     shutdown: ProcessManager["shutdown"];
     onProcessCountChange: ProcessManager["onProcessCountChange"];
@@ -58,6 +60,7 @@ export function createMockManager(
     .mockResolvedValue(defaultStartupResult);
   const list = vi.fn<() => ProcessInfo[]>().mockReturnValue([]);
   const getLogs = vi.fn<(...args: any[]) => LogEntry[]>().mockReturnValue([]);
+  const getLogOffset = vi.fn<(...args: any[]) => number>().mockReturnValue(0);
   const has = vi.fn<(...args: any[]) => boolean>().mockReturnValue(false);
   const shutdown = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
   const onProcessCountChange = vi.fn<(callback: (count: number) => void) => void>();
@@ -77,6 +80,9 @@ export function createMockManager(
   if (overrides?.getLogs) {
     getLogs.mockImplementation(overrides.getLogs as any);
   }
+  if (overrides?.getLogOffset) {
+    getLogOffset.mockImplementation(overrides.getLogOffset as any);
+  }
   if (overrides?.has) {
     has.mockImplementation(overrides.has as any);
   }
@@ -93,11 +99,10 @@ export function createMockManager(
     restart,
     list,
     getLogs,
+    getLogOffset,
     has,
     size: overrides?.size ?? 0,
     shutdown,
     onProcessCountChange,
-    processes: new Map() as any,
-    emitProcessCount: vi.fn(),
   };
 }

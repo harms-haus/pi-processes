@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { createRestartProcessTool } from "../../tools/restart-process.js";
 import type { StartupResult } from "../../types.js";
 import { createMockManager, createMockTheme, executeTool } from "../helpers/index.js";
@@ -6,8 +6,13 @@ import { createMockManager, createMockTheme, executeTool } from "../helpers/inde
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe("createRestartProcessTool", () => {
-  const mockManager = createMockManager();
-  const tool = createRestartProcessTool(() => mockManager as any);
+  let mockManager: ReturnType<typeof createMockManager>;
+  let tool: ReturnType<typeof createRestartProcessTool>;
+
+  beforeEach(() => {
+    mockManager = createMockManager();
+    tool = createRestartProcessTool(() => mockManager as any);
+  });
 
   // 1. Tool registration has correct name, label, description
   describe("registration", () => {
@@ -22,15 +27,6 @@ describe("createRestartProcessTool", () => {
     it("has correct description", () => {
       expect(tool.description).toContain("Restart a managed process");
       expect(tool.description).toContain("Kills the existing process");
-    });
-
-    it("has promptSnippet", () => {
-      expect(tool.promptSnippet).toBeDefined();
-    });
-
-    it("has promptGuidelines", () => {
-      expect(tool.promptGuidelines).toBeDefined();
-      expect(tool.promptGuidelines!.length).toBeGreaterThan(0);
     });
   });
 

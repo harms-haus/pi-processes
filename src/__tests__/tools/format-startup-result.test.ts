@@ -47,18 +47,18 @@ describe("formatStartupResult", () => {
     expect(output).toContain("(no output)");
   });
 
-  it("includes PID in the output", () => {
-    const result = makeResult({ pid: 98765 });
-    const output = formatStartupResult("started", result);
-
-    expect(output).toContain("PID 98765");
-  });
-
   it("formats startup time as seconds with 1 decimal place", () => {
     const result = makeResult({ startupTime: 2345 });
     const output = formatStartupResult("started", result);
 
     expect(output).toContain("2.3s");
+  });
+
+  it("formats zero startup time correctly", () => {
+    const result = makeResult({ startupTime: 0 });
+    const output = formatStartupResult("started", result);
+
+    expect(output).toContain("0.0s");
   });
 
   it("includes maxDelay with 's' suffix", () => {

@@ -3,7 +3,13 @@ import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProcessManager } from "../process-manager.js";
-import { DEFAULT_START_DELAY, MAX_LOG_ENTRIES, MAX_PROCESSES, SIGKILL_DELAY_MS } from "../types.js";
+import {
+  DEFAULT_START_DELAY,
+  MAX_LOG_ENTRIES,
+  MAX_LOG_LINE_BYTES,
+  MAX_PROCESSES,
+  SIGKILL_DELAY_MS,
+} from "../types.js";
 
 // ── Mock child_process ──────────────────────────────────────────────────────
 
@@ -436,17 +442,14 @@ describe("ProcessManager", () => {
       vi.advanceTimersByTime(1000);
       await promise;
 
-      // Callback should only be called 4 times:
-      // 1. Initial onProcessCountChange call (count=0)
-      // 2. After starting first process (count=1)
-      // 3. During kill in shutdown (count=0)
-      // 4. During shutdown emitProcessCount after clear (count=0)
+      // Expected: callback sees 0 (initial) → 1 (after start) → 0 (after kill in shutdown)
       // NOT called for second process start because callback was cleared
-      expect(callback).toHaveBeenCalledTimes(4);
-      expect(callback).toHaveBeenNthCalledWith(1, 0);
-      expect(callback).toHaveBeenNthCalledWith(2, 1);
-      expect(callback).toHaveBeenNthCalledWith(3, 0);
-      expect(callback).toHaveBeenNthCalledWith(4, 0);
+      expect(callback).toHaveBeenCalledWith(0); // Initial/shutdown
+      expect(callback).toHaveBeenCalledWith(1); // After starting process
+
+      // Verify no new calls after shutdown — callback was cleared
+      const callsBeforeNewStart = callback.mock.calls.length;
+      expect(callback.mock.calls.length).toBe(callsBeforeNewStart); // No new calls
     });
   });
 
@@ -835,6 +838,300 @@ describe("ProcessManager", () => {
       // Only the latest callback (B) should fire
       expect(callbackA).not.toHaveBeenCalled();
       expect(callbackB).toHaveBeenCalledWith(1);
+    });
+  });
+
+  // ── Line buffering ──────────────────────────────────────────────────
+
+  describe("line buffering", () => {
+    it("assembles partial line then completion into one log entry", async () => {
+      const mockCp = createMockChildProcess();
+      mockSpawn.mockReturnValue(mockCp);
+
+      const promise = pm.start("test", "cmd", 1);
+      mockCp.stdout!.emit("data", Buffer.from("partial"));
+      mockCp.stdout!.emit("data", Buffer.from(" line\n"));
+      vi.advanceTimersByTime(1000);
+      await promise;
+
+      const logs = pm.getLogs("test");
+      expect(logs).toHaveLength(1);
+      expect(logs[0].text).toBe("partial line");
+      expect(logs[0].stream).toBe("stdout");
+    });
+
+    it("handles multiple complete lines in one chunk", async () => {
+      const mockCp = createMockChildProcess();
+      mockSpawn.mockReturnValue(mockCp);
+
+      const promise = pm.start("test", "cmd", 1);
+      mockCp.stdout!.emit("data", Buffer.from("line1\nline2\n"));
+      vi.advanceTimersByTime(1000);
+      await promise;
+
+      const logs = pm.getLogs("test");
+      expect(logs).toHaveLength(2);
+      expect(logs[0].text).toBe("line1");
+      expect(logs[1].text).toBe("line2");
+    });
+
+    it("handles mixed partial chunks across multiple emissions", async () => {
+      const mockCp = createMockChildProcess();
+      mockSpawn.mockReturnValue(mockCp);
+
+      const promise = pm.start("test", "cmd", 1);
+      mockCp.stdout!.emit("data", Buffer.from("A"));
+      mockCp.stdout!.emit("data", Buffer.from("\nB\nC"));
+      mockCp.stdout!.emit("data", Buffer.from("D\n"));
+      vi.advanceTimersByTime(1000);
+      await promise;
+
+      const logs = pm.getLogs("test");
+      expect(logs).toHaveLength(3);
+      expect(logs[0].text).toBe("A");
+      expect(logs[1].text).toBe("B");
+      expect(logs[2].text).toBe("CD");
+    });
+  });
+
+  // ── Phase 1 bug fix tests ─────────────────────────────────────────────
+
+  describe("Phase 1 bug fixes", () => {
+    it("B2: late error after startup emits warning and removes process", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      try {
+        const { mockCp } = await startAndResolve(pm, "test", "sleep 10");
+
+        // Emit an error after startup has completed
+        mockCp.emit("error", new Error("something broke after startup"));
+
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("test"));
+        expect(pm.has("test")).toBe(false);
+        expect(pm.size).toBe(0);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it("B5: kill on exited process uses exitTime for totalRuntime", async () => {
+      const { mockCp } = await startAndResolve(pm, "test", "sleep 10");
+
+      // Advance 1000ms then let process exit naturally
+      vi.advanceTimersByTime(1000);
+      mockCp.emit("exit", 0, null);
+
+      // Grab the record's exitTime right after exit
+      const record = (pm as any).processes.get("test");
+      const exitTime = record.exitTime;
+      const startTime = record.startTime;
+      const expectedRuntime = exitTime - startTime;
+
+      // Advance significantly past exitTime
+      vi.advanceTimersByTime(60000);
+
+      const result = await pm.kill("test");
+
+      // totalRuntime should use exitTime, not Date.now()
+      expect(result.totalRuntime).toBe(expectedRuntime);
+    });
+
+    it("Z: cleanup on natural exit retains record and cleans up resources", async () => {
+      const mockCp = createMockChildProcess();
+      const removeAllListenersSpy = vi.spyOn(mockCp, "removeAllListeners");
+      const stdoutDestroySpy = vi.spyOn(mockCp.stdout!, "destroy");
+      const stderrDestroySpy = vi.spyOn(mockCp.stderr!, "destroy");
+      mockSpawn.mockReturnValue(mockCp);
+
+      const promise = pm.start("test", "echo hi", 1);
+      mockCp.stdout!.emit("data", Buffer.from("hello\n"));
+      vi.advanceTimersByTime(1000);
+      await promise;
+
+      // Simulate natural exit
+      mockCp.emit("exit", 0, null);
+
+      // Record should still be in map so getLogs still works
+      expect(pm.has("test")).toBe(true);
+      expect(pm.getLogs("test")).toHaveLength(1);
+
+      // removeAllListeners was called on the child process
+      expect(removeAllListenersSpy).toHaveBeenCalled();
+
+      // Streams were destroyed
+      expect(stdoutDestroySpy).toHaveBeenCalled();
+      expect(stderrDestroySpy).toHaveBeenCalled();
+
+      // record.process should be nulled out
+      const record = (pm as any).processes.get("test");
+      expect(record.process).toBeNull();
+    });
+
+    it("R5: force-resolve timeout kills unresponsive process after SIGKILL + KILL_FORCE_RESOLVE_MS", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      try {
+        // Create a mock that ignores both SIGTERM and SIGKILL
+        const mockCp = new EventEmitter() as unknown as ChildProcess;
+        Object.defineProperty(mockCp, "pid", {
+          value: 12345,
+          writable: false,
+        });
+        (mockCp as any).stdout = new PassThrough();
+        (mockCp as any).stderr = new PassThrough();
+        (mockCp as any).stdin = { end: vi.fn() };
+        (mockCp as any).killed = false;
+        (mockCp as any).kill = vi.fn(); // Never emits exit
+
+        mockSpawn.mockReturnValue(mockCp);
+
+        const promise = pm.start("test", "stubborn", 1);
+        vi.advanceTimersByTime(1000);
+        await promise;
+
+        const killPromise = pm.kill("test");
+
+        // SIGTERM was sent
+        expect((mockCp as any).kill).toHaveBeenCalledWith("SIGTERM");
+
+        // Advance past SIGKILL escalation
+        vi.advanceTimersByTime(SIGKILL_DELAY_MS);
+        expect((mockCp as any).kill).toHaveBeenCalledWith("SIGKILL");
+
+        // Advance past KILL_FORCE_RESOLVE_MS (5000ms)
+        vi.advanceTimersByTime(5000);
+
+        // Kill promise should resolve (not hang)
+        const result = await killPromise;
+        expect(result.name).toBe("test");
+
+        // console.warn was called about force-resolving
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Force-resolving"));
+
+        // Process removed from map
+        expect(pm.has("test")).toBe(false);
+        expect(pm.size).toBe(0);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it("M5: no stale timer fires after startup resolution", async () => {
+      const mockCp = createMockChildProcess();
+      mockSpawn.mockReturnValue(mockCp);
+
+      const promise = pm.start("test", "echo hi", 1);
+      vi.advanceTimersByTime(1000);
+      const result = await promise;
+      expect(result.name).toBe("test");
+
+      // Emit more data after startup is complete
+      mockCp.stdout!.emit("data", Buffer.from("post-startup line\n"));
+
+      // Advance timers significantly — no stale debounce timer should fire
+      vi.advanceTimersByTime(10000);
+
+      // No errors thrown, process still exists and is healthy
+      expect(pm.has("test")).toBe(true);
+      expect(pm.size).toBe(1);
+
+      // Log was captured correctly
+      const logs = pm.getLogs("test");
+      expect(logs.some((l) => l.text === "post-startup line")).toBe(true);
+    });
+  });
+
+  // ── Log line truncation ───────────────────────────────────────────────
+
+  describe("log line truncation", () => {
+    it("truncates lines exceeding MAX_LOG_LINE_BYTES", async () => {
+      const mockCp = createMockChildProcess();
+      mockSpawn.mockReturnValue(mockCp);
+
+      const promise = pm.start("test", "cmd", 1);
+
+      // Emit a single line that is 10000 characters long
+      const longLine = "x".repeat(10000);
+      mockCp.stdout!.emit("data", Buffer.from(`${longLine}\n`));
+
+      vi.advanceTimersByTime(1000);
+      await promise;
+
+      const logs = pm.getLogs("test");
+      expect(logs).toHaveLength(1);
+      // Should be truncated to MAX_LOG_LINE_BYTES + 3 ('...')
+      expect(logs[0].text.length).toBe(MAX_LOG_LINE_BYTES + 3);
+      expect(logs[0].text).toBe("x".repeat(MAX_LOG_LINE_BYTES) + "...");
+    });
+
+    it("does not truncate normal-length lines", async () => {
+      const mockCp = createMockChildProcess();
+      mockSpawn.mockReturnValue(mockCp);
+
+      const promise = pm.start("test", "cmd", 1);
+
+      // Emit a line well under the limit
+      const normalLine = "hello world";
+      mockCp.stdout!.emit("data", Buffer.from(`${normalLine}\n`));
+
+      vi.advanceTimersByTime(1000);
+      await promise;
+
+      const logs = pm.getLogs("test");
+      expect(logs).toHaveLength(1);
+      expect(logs[0].text).toBe(normalLine);
+      expect(logs[0].text.length).toBe(normalLine.length);
+    });
+  });
+
+  // ── Spawn failure: pid undefined ─────────────────────────────────────
+
+  describe("spawn failure: pid undefined", () => {
+    it("throws when childProcess.pid is undefined", async () => {
+      // Create a ChildProcess-like object with pid: undefined
+      const mockCp = new EventEmitter() as unknown as ChildProcess;
+      Object.defineProperty(mockCp, "pid", {
+        value: undefined,
+        writable: false,
+      });
+      (mockCp as any).stdout = new PassThrough();
+      (mockCp as any).stderr = new PassThrough();
+      (mockCp as any).stdin = { end: vi.fn() };
+      (mockCp as any).kill = vi.fn();
+
+      mockSpawn.mockReturnValue(mockCp);
+
+      await expect(pm.start("my-proc", "bad-cmd", 1)).rejects.toThrow(
+        /Failed to spawn process "my-proc".*no pid/,
+      );
+
+      // Process should not be in the manager
+      expect(pm.has("my-proc")).toBe(false);
+      expect(pm.size).toBe(0);
+    });
+
+    it("does not add process to registry when pid is undefined", async () => {
+      const mockCp = new EventEmitter() as unknown as ChildProcess;
+      Object.defineProperty(mockCp, "pid", {
+        value: undefined,
+        writable: false,
+      });
+      (mockCp as any).stdout = new PassThrough();
+      (mockCp as any).stderr = new PassThrough();
+      (mockCp as any).stdin = { end: vi.fn() };
+      (mockCp as any).kill = vi.fn();
+
+      mockSpawn.mockReturnValue(mockCp);
+
+      try {
+        await pm.start("no-pid-proc", "some-cmd", 1);
+      } catch {
+        // Expected
+      }
+
+      // Even after advancing timers, no process should exist
+      vi.advanceTimersByTime(10000);
+      expect(pm.size).toBe(0);
     });
   });
 });

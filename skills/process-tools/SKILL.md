@@ -91,6 +91,8 @@ Log lines are formatted as: `[lineNum] +Nms [stdout|stderr] text`
 
 Example: `[1] +1000ms [stdout] Server listening on port 3000`
 
+Line numbers are stable across eviction. When the internal log buffer exceeds 10,000 entries, the oldest lines are discarded, but displayed line numbers reflect the absolute position since process start. For example, after 15,000 lines, `head=10` would show lines `[5001]`–`[5010]`.
+
 Use `stderr` lines to identify errors. Look for keywords: `Error`, `EADDRINUSE`, `ENOENT`, `TypeError`, `Unhandled`, `FATAL`.
 
 ### `restart_process`
@@ -106,7 +108,7 @@ If `command` is omitted, it reuses the original command. The `start_delay` param
 
 ### `kill_process`
 
-Use to permanently stop a process when it's no longer needed or when a restart is not desired.
+Use to permanently stop a process when it's no longer needed or when a restart is not desired. If the process has already exited naturally, calling `kill_process` simply removes its record from the manager (no signals are sent).
 
 ```
 kill_process(name="temp-server")

@@ -31,6 +31,11 @@ describe("formatTimestamp", () => {
   it("pads single-digit values", () => {
     expect(formatTimestamp(1001)).toBe("00:00:01.001");
   });
+
+  it("clamps negative values to zero", () => {
+    expect(formatTimestamp(-1)).toBe("00:00:00.000");
+    expect(formatTimestamp(-1000)).toBe("00:00:00.000");
+  });
 });
 
 describe("formatLogTimestamp", () => {
@@ -40,5 +45,9 @@ describe("formatLogTimestamp", () => {
 
   it("formats zero with plus sign", () => {
     expect(formatLogTimestamp(0)).toBe("+00:00:00.000");
+  });
+
+  it("clamps negative input to zero", () => {
+    expect(formatLogTimestamp(-500)).toBe("+00:00:00.000");
   });
 });

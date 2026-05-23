@@ -5,6 +5,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { beforeEach, describe, expect, it, vi, type MockedFunction } from "vitest";
 
+import type { LogEntry, ProcessInfo } from "../types.js";
 import type { ProcessManager } from "../process-manager.js";
 
 // ── Hoisted mock state ──────────────────────────────────────────────────────
@@ -64,7 +65,13 @@ vi.mock("../tools/restart-process.js", () => ({
   createRestartProcessTool,
 }));
 
-const mockLogDialog = vi.hoisted(() => vi.fn());
+const mockLogDialog = vi.hoisted(() =>
+  vi.fn().mockImplementation(() => ({
+    setRequestRender: vi.fn(),
+    render: vi.fn(),
+    handleInput: vi.fn(),
+  })),
+);
 vi.mock("../ui/log-dialog.js", () => ({
   LogDialog: mockLogDialog,
 }));
@@ -144,7 +151,6 @@ describe("index (extension entry point)", () => {
   let extension: (pi: ExtensionAPI) => void;
 
   beforeEach(async () => {
-    vi.clearAllMocks();
     const mod = await import("../index.js");
     extension = mod.default;
   });
@@ -508,6 +514,62 @@ describe("index (extension entry point)", () => {
       await handler(ctx);
 
       expect(ctx.ui.setEditorText).not.toHaveBeenCalled();
+    });
+  });
+
+  // 7. createLogDialogOverlay
+  describe("createLogDialogOverlay", () => {
+    it("returns a factory that creates a LogDialog with render and handleInput", async () => {
+      const mod = await import("../index.js");
+      const createLogDialogOverlay = mod.createLogDialogOverlay;
+
+      const processes: ProcessInfo[] = [
+        {
+          name: "dev-server",
+          pid: 12345,
+          command: "npm run dev",
+          startTime: Date.now(),
+          running: true,
+          uptimeSec: 42,
+          logLines: 3,
+          startupComplete: true,
+        },
+      ];
+      const logs: LogEntry[] = [
+        { timestamp: 1000, stream: "stdout", text: "line 1" },
+        { timestamp: 2000, stream: "stderr", text: "line 2" },
+        { timestamp: 3000, stream: "stdout", text: "line 3" },
+      ];
+      const logsByProcess = new Map<string, LogEntry[]>();
+      logsByProcess.set("dev-server", logs);
+
+      const factory = createLogDialogOverlay(processes, logsByProcess);
+
+      const mockTui = { requestRender: vi.fn() };
+      const mockTheme = {
+        fg: vi.fn((_: string, text: string) => text),
+        bg: vi.fn((_: string, text: string) => text),
+        bold: vi.fn((text: string) => text),
+      };
+      const mockDone = vi.fn();
+
+      const dialog = factory(mockTui, mockTheme, undefined, mockDone);
+
+      // The factory should have called the LogDialog constructor
+      expect(mockLogDialog).toHaveBeenCalledWith(processes, logsByProcess, mockTheme, mockDone);
+
+      // Verify the dialog has the expected methods
+      expect(dialog).toHaveProperty("render");
+      expect(dialog).toHaveProperty("handleInput");
+      expect(dialog).toHaveProperty("setRequestRender");
+
+      // Verify setRequestRender was called, wiring up tui.requestRender
+      expect(dialog.setRequestRender).toHaveBeenCalledTimes(1);
+      // Trigger the render callback to verify it calls tui.requestRender
+      const renderCallback = (dialog.setRequestRender as MockedFunction<any>).mock
+        .calls[0][0] as () => void;
+      renderCallback();
+      expect(mockTui.requestRender).toHaveBeenCalledTimes(1);
     });
   });
 });

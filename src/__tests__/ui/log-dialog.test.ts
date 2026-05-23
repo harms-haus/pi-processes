@@ -509,22 +509,21 @@ describe("LogDialog", () => {
   // ── setRequestRender / setContentHeight / invalidate ──────────────────
 
   describe("component interface", () => {
-    it("setRequestRender stores the callback", () => {
+    it("invalidate then render produces correct output without corrupting state", () => {
       const proc = makeProcess({ name: "dev-server" });
-      const dialog = new LogDialog([proc], new Map(), theme, onDone);
-      const myRender = vi.fn();
-      dialog.setRequestRender(myRender);
-      dialog.setContentHeight(20);
+      const entries = [makeLog("Line 1"), makeLog("Line 2")];
+      const logs = new Map<string, LogEntry[]>([["dev-server", entries]]);
+      const dialog = createDialog([proc], logs);
 
-      dialog.handleInput(KEYS.down);
-      expect(myRender).toHaveBeenCalled();
-    });
+      // Render once to establish baseline
+      const before = dialog.render(80);
 
-    it("invalidate() does not throw", () => {
-      const dialog = createDialog();
-      expect(() => {
-        dialog.invalidate();
-      }).not.toThrow();
+      // Invalidate then render again
+      dialog.invalidate();
+      const after = dialog.render(80);
+
+      // Output should be identical after invalidate (no state corruption)
+      expect(after).toEqual(before);
     });
 
     it("setContentHeight adjusts viewport", () => {
@@ -548,6 +547,80 @@ describe("LogDialog", () => {
         (l) => l.includes("more above") || l.includes("more below"),
       );
       expect(hasScrollIndicator).toBe(true);
+    });
+  });
+
+  // ── clampViewport edge cases ──────────────────────────────────────────
+
+  describe("clampViewport edge cases", () => {
+    it("renders without crashing when contentHeight is 0", () => {
+      const proc = makeProcess({ name: "dev-server" });
+      const entries = makeLogs(10);
+      const logs = new Map<string, LogEntry[]>([["dev-server", entries]]);
+      const dialog = createDialog([proc], logs);
+
+      // Set contentHeight to 0 — should not crash
+      dialog.setContentHeight(0);
+
+      // render should complete without throwing
+      expect(() => dialog.render(80)).not.toThrow();
+    });
+
+    it("scrolls viewport correctly when navigating beyond boundary", () => {
+      const proc = makeProcess({ name: "dev-server" });
+      // Create many logs with a small viewport
+      const entries = makeLogs(50);
+      const logs = new Map<string, LogEntry[]>([["dev-server", entries]]);
+      const dialog = createDialog([proc], logs);
+      dialog.setContentHeight(5);
+
+      // Navigate down past the viewport boundary (5 lines visible)
+      // Starting at index 0, viewport shows 0-4
+      // Move down 10 times — selection at index 10
+      for (let i = 0; i < 10; i++) {
+        dialog.handleInput(KEYS.down);
+      }
+
+      const lines = dialog.render(80);
+
+      // Should show scroll indicator for lines above
+      expect(lines.some((l) => l.includes("more above"))).toBe(true);
+
+      // Should contain the selected line (Line 11)
+      expect(lines.some((l) => l.includes("Line 11"))).toBe(true);
+
+      // Should NOT contain lines from the very beginning (Line 1 through Line 5)
+      // Note: "Line 1" could match "Line 10", "Line 11", etc., so check for unique early lines
+      expect(lines.every((l) => !l.includes("Line 5 "))).toBe(true);
+    });
+
+    it("scrolls viewport back up when navigating above top boundary", () => {
+      const proc = makeProcess({ name: "dev-server" });
+      const entries = makeLogs(50);
+      const logs = new Map<string, LogEntry[]>([["dev-server", entries]]);
+      const dialog = createDialog([proc], logs);
+      dialog.setContentHeight(5);
+
+      // Navigate down to index 20
+      for (let i = 0; i < 20; i++) {
+        dialog.handleInput(KEYS.down);
+      }
+
+      // Navigate back up to index 0
+      for (let i = 0; i < 20; i++) {
+        dialog.handleInput(KEYS.up);
+      }
+
+      const lines = dialog.render(80);
+
+      // Should show scroll indicator for lines below
+      expect(lines.some((l) => l.includes("more below"))).toBe(true);
+
+      // Should contain the first line (Line 1)
+      expect(lines.some((l) => l.includes("Line 1"))).toBe(true);
+
+      // Should NOT show "more above" since we are at the top
+      expect(lines.every((l) => !l.includes("more above"))).toBe(true);
     });
   });
 

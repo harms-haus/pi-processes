@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { createStartProcessTool } from "../../tools/start-process.js";
 import type { StartupResult } from "../../types.js";
 import { createMockManager, createMockTheme, executeTool } from "../helpers/index.js";
@@ -6,8 +6,13 @@ import { createMockManager, createMockTheme, executeTool } from "../helpers/inde
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe("createStartProcessTool", () => {
-  const mockManager = createMockManager();
-  const tool = createStartProcessTool(() => mockManager as any);
+  let mockManager: ReturnType<typeof createMockManager>;
+  let tool: ReturnType<typeof createStartProcessTool>;
+
+  beforeEach(() => {
+    mockManager = createMockManager();
+    tool = createStartProcessTool(() => mockManager as any);
+  });
 
   // 1. Tool registration has correct name, label, description
   describe("registration", () => {
@@ -22,15 +27,6 @@ describe("createStartProcessTool", () => {
     it("has correct description", () => {
       expect(tool.description).toContain("long-running process");
       expect(tool.description).toContain("startup logs");
-    });
-
-    it("has promptSnippet", () => {
-      expect(tool.promptSnippet).toBeDefined();
-    });
-
-    it("has promptGuidelines", () => {
-      expect(tool.promptGuidelines).toBeDefined();
-      expect(tool.promptGuidelines!.length).toBeGreaterThan(0);
     });
   });
 

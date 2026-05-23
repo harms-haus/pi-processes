@@ -1,6 +1,15 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { DEFAULT_START_DELAY, MAX_LOG_ENTRIES, MAX_PROCESSES, SIGKILL_DELAY_MS } from "./types.js";
+import {
+  DEFAULT_START_DELAY,
+  MAX_LOG_ENTRIES,
+  MAX_LOG_LINE_BYTES,
+  MAX_PROCESSES,
+  SIGKILL_DELAY_MS,
+} from "./types.js";
 import type { KillResult, LogEntry, ProcessInfo, ProcessRecord, StartupResult } from "./types.js";
+
+/** Time to wait after SIGKILL before force-resolving the kill promise (ms). */
+const KILL_FORCE_RESOLVE_MS = 5000;
 
 /**
  * Manages spawned child processes with debounce-based startup detection,
@@ -61,6 +70,15 @@ export class ProcessManager {
     return record.logs;
   }
 
+  /** Get the number of log entries that have been trimmed from the front due to MAX_LOG_ENTRIES */
+  getLogOffset(name: string): number {
+    const record = this.processes.get(name);
+    if (!record) {
+      throw new Error(`Process "${name}" not found`);
+    }
+    return record.logOffset;
+  }
+
   /**
    * Start a new process. Returns after startup debounce completes.
    * @param name - Unique name for the process
@@ -83,8 +101,8 @@ export class ProcessManager {
       this.resetDebounce(record, startDelay);
     };
 
-    this.setupStreamHandler(childProcess, "stdout", addLog, resetDebounce);
-    this.setupStreamHandler(childProcess, "stderr", addLog, resetDebounce);
+    this.setupStreamHandler(childProcess, "stdout", record, addLog, resetDebounce);
+    this.setupStreamHandler(childProcess, "stderr", record, addLog, resetDebounce);
     this.setupErrorHandler(record, childProcess);
     this.setupExitHandler(record, childProcess);
 
@@ -133,6 +151,10 @@ export class ProcessManager {
       debounceTimer: null,
       maxDelay: 0,
       lastLogTime: startTime,
+      exitTime: null,
+      logOffset: 0,
+      pendingStdout: "",
+      pendingStderr: "",
     };
 
     return { childProcess, record };
@@ -148,6 +170,11 @@ export class ProcessManager {
       }
       record.lastLogTime = now;
 
+      // Truncate excessively long lines to prevent unbounded memory growth
+      if (text.length > MAX_LOG_LINE_BYTES) {
+        text = text.slice(0, MAX_LOG_LINE_BYTES) + "...";
+      }
+
       const entry: LogEntry = {
         timestamp: now - record.startTime,
         stream,
@@ -156,22 +183,38 @@ export class ProcessManager {
       record.logs.push(entry);
       if (record.logs.length > MAX_LOG_ENTRIES) {
         record.logs.shift();
+        record.logOffset++;
       }
     };
   }
 
-  /** Parse a data chunk into individual non-empty lines and add them as log entries */
-  private parseChunk(
+  /** Handle a data chunk with proper line buffering for partial lines at chunk boundaries */
+  private handleChunk(
     chunk: Buffer,
     stream: "stdout" | "stderr",
+    record: ProcessRecord,
     addLog: (stream: "stdout" | "stderr", text: string) => void,
+    resetDebounce: () => void,
   ): void {
-    const lines = chunk.toString().split("\n");
-    for (const line of lines) {
+    const pendingField =
+      stream === "stdout" ? ("pendingStdout" as const) : ("pendingStderr" as const);
+
+    // Cap the pending buffer to prevent unbounded growth when no newlines arrive
+    if (record[pendingField].length > MAX_LOG_LINE_BYTES) {
+      addLog(stream, record[pendingField].slice(0, MAX_LOG_LINE_BYTES) + "...");
+      record[pendingField] = "";
+    }
+
+    const data = record[pendingField] + chunk.toString();
+    const parts = data.split("\n");
+    // Last element is the incomplete remainder (or empty string if chunk ended with \n)
+    record[pendingField] = parts.pop() ?? "";
+    for (const line of parts) {
       if (line !== "") {
         addLog(stream, line);
       }
     }
+    resetDebounce();
   }
 
   /** Reset the startup debounce timer — each output event calls this */
@@ -184,6 +227,8 @@ export class ProcessManager {
       if (!record.startupComplete && record.startupResolve) {
         record.startupComplete = true;
         record.startupResolve(this.buildStartupResult(record));
+        record.startupResolve = null;
+        record.startupReject = null;
       }
     }, startDelay * 1000);
   }
@@ -192,34 +237,75 @@ export class ProcessManager {
   private setupStreamHandler(
     childProcess: ChildProcess,
     stream: "stdout" | "stderr",
+    record: ProcessRecord,
     addLog: (stream: "stdout" | "stderr", text: string) => void,
     resetDebounce: () => void,
   ): void {
     childProcess[stream]?.on("data", (chunk: Buffer) => {
-      this.parseChunk(chunk, stream, addLog);
-      resetDebounce();
+      this.handleChunk(chunk, stream, record, addLog, resetDebounce);
     });
+  }
+
+  /** Properly clean up all listeners and streams for a process record */
+  private cleanupRecord(record: ProcessRecord): void {
+    // 1. Clear debounce timer
+    if (record.debounceTimer !== null) {
+      clearTimeout(record.debounceTimer);
+      record.debounceTimer = null;
+    }
+
+    // 2. Null out startup promise handles (fixes M5)
+    record.startupResolve = null;
+    record.startupReject = null;
+
+    // 3. Remove listeners from streams, then destroy (guard for null'd process)
+    if (record.process) {
+      if (record.process.stdout) {
+        record.process.stdout.removeAllListeners();
+        record.process.stdout.destroy();
+      }
+      if (record.process.stderr) {
+        record.process.stderr.removeAllListeners();
+        record.process.stderr.destroy();
+      }
+
+      // 4. Remove all listeners from child process itself
+      record.process.removeAllListeners();
+    }
   }
 
   /** Attach error handler — fires if spawn itself fails (ENOENT, EACCES, etc.) */
   private setupErrorHandler(record: ProcessRecord, childProcess: ChildProcess): void {
-    childProcess.on("error", (err) => {
+    childProcess.on("error", (err: Error) => {
+      // Clear debounce timer
       if (record.debounceTimer !== null) {
         clearTimeout(record.debounceTimer);
         record.debounceTimer = null;
       }
+
+      if (!record.startupComplete && record.startupReject) {
+        // Error during startup — reject the startup promise
+        record.startupComplete = true;
+        record.startupReject(new Error(`Failed to spawn process "${record.name}": ${err.message}`));
+        record.startupReject = null;
+        record.startupResolve = null;
+      } else {
+        // Error AFTER startup — log warning instead of silently swallowing
+        console.warn(`Process "${record.name}" error after startup: ${err.message}`);
+      }
+
+      // Always clean up and remove from map
+      this.cleanupRecord(record);
       this.processes.delete(record.name);
       this.emitProcessCount();
-
-      if (record.startupReject) {
-        record.startupReject(new Error(`Failed to spawn process "${record.name}": ${err.message}`));
-      }
     });
   }
 
   /** Attach exit handler — resolves startup if it hasn't completed yet */
   private setupExitHandler(record: ProcessRecord, childProcess: ChildProcess): void {
     childProcess.on("exit", (_code) => {
+      // Set exitTime BEFORE exited so kill() sees consistent state
+      record.exitTime = Date.now();
       record.exited = true;
 
       // If startup hasn't completed yet, resolve now
@@ -229,7 +315,31 @@ export class ProcessManager {
         }
         record.startupComplete = true;
         record.startupResolve(this.buildStartupResult(record));
+        record.startupResolve = null;
+        record.startupReject = null;
       }
+
+      // Light cleanup: detach listeners and release OS process handle.
+      // Record stays in map so logs remain accessible via getLogs().
+      if (record.debounceTimer !== null) {
+        clearTimeout(record.debounceTimer);
+        record.debounceTimer = null;
+      }
+      record.startupResolve = null;
+      record.startupReject = null;
+
+      if (childProcess.stdout) {
+        childProcess.stdout.removeAllListeners();
+        childProcess.stdout.destroy();
+      }
+      if (childProcess.stderr) {
+        childProcess.stderr.removeAllListeners();
+        childProcess.stderr.destroy();
+      }
+      childProcess.removeAllListeners();
+
+      // Release OS process handle (safe because record.exited is already true)
+      record.process = null;
     });
   }
 
@@ -268,43 +378,77 @@ export class ProcessManager {
       throw new Error(`Process "${name}" not found`);
     }
 
+    if (record.killing) {
+      throw new Error(`Process "${name}" is already being killed`);
+    }
+
+    // If already exited naturally, just remove the record — record.process may be null
     if (record.exited) {
       this.processes.delete(name);
       this.emitProcessCount();
       return {
         name,
         pid: record.pid,
-        totalRuntime: Date.now() - record.startTime,
+        totalRuntime: (record.exitTime ?? Date.now()) - record.startTime,
       };
     }
 
-    if (record.killing) {
-      throw new Error(`Process "${name}" is already being killed`);
+    // After the exited guard above, process should be non-null
+    const proc = record.process;
+    if (!proc) {
+      throw new Error(`Process "${name}" has already been cleaned up`);
     }
-    record.killing = true;
 
     return new Promise<KillResult>((resolve) => {
-      // SIGKILL escalation timer
-      const sigkillTimer = setTimeout(() => {
-        record.process.kill("SIGKILL");
-      }, SIGKILL_DELAY_MS);
+      let resolved = false;
 
-      // Listen for exit
-      const onExit = () => {
+      const finish = () => {
+        if (resolved) return;
+        resolved = true;
         clearTimeout(sigkillTimer);
+        clearTimeout(forceResolveTimer);
+        proc.removeListener("exit", onExit);
+        this.cleanupRecord(record);
         this.processes.delete(name);
         this.emitProcessCount();
         resolve({
           name,
           pid: record.pid,
-          totalRuntime: Date.now() - record.startTime,
+          totalRuntime: (record.exitTime ?? Date.now()) - record.startTime,
         });
       };
 
-      record.process.once("exit", onExit);
+      const onExit = () => {
+        finish();
+      };
+
+      // SIGKILL escalation timer
+      const sigkillTimer = setTimeout(() => {
+        proc.kill("SIGKILL");
+      }, SIGKILL_DELAY_MS);
+
+      // Force-resolve timer for uninterruptible (D-state) processes
+      const forceResolveTimer = setTimeout(() => {
+        if (resolved) return;
+        console.warn(
+          `Process "${name}" (PID ${record.pid}) did not exit after SIGKILL. Force-resolving kill promise.`,
+        );
+        finish();
+      }, SIGKILL_DELAY_MS + KILL_FORCE_RESOLVE_MS);
+
+      // Register exit listener BEFORE checking record.exited to avoid TOCTOU race
+      proc.once("exit", onExit);
+
+      // If already exited between the initial check and listener registration, resolve now
+      if (record.exited) {
+        finish();
+        return;
+      }
+
+      record.killing = true;
 
       // Send SIGTERM
-      record.process.kill("SIGTERM");
+      proc.kill("SIGTERM");
     });
   }
 
@@ -335,6 +479,9 @@ export class ProcessManager {
   async shutdown(): Promise<void> {
     const names = [...this.processes.keys()];
     await Promise.allSettled(names.map((name) => this.kill(name)));
+    for (const record of this.processes.values()) {
+      this.cleanupRecord(record);
+    }
     this.processes.clear();
     this.emitProcessCount();
     this.processCountCallback = undefined;
