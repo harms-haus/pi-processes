@@ -85,8 +85,9 @@ function filterByGrep(
   }
   const result: Array<{ entry: LogEntry; originalIndex: number }> = [];
   for (let i = 0; i < logs.length; i++) {
-    if (regex.test(logs[i].text)) {
-      result.push({ entry: logs[i], originalIndex: i });
+    const log = logs[i];
+    if (log !== undefined && regex.test(log.text)) {
+      result.push({ entry: log, originalIndex: i });
     }
   }
   return result;
@@ -155,7 +156,9 @@ export function queryLogs(
   const count = sliceEnd - sliceStart;
   const parts = new Array<string>(count);
   for (let i = 0; i < count; i++) {
-    const { entry, originalIndex } = filteredLogs[sliceStart + i];
+    const filtered = filteredLogs[sliceStart + i];
+    if (filtered === undefined) continue;
+    const { entry, originalIndex } = filtered;
     parts[i] = formatLine(entry, originalIndex + 1 + logOffset);
   }
 

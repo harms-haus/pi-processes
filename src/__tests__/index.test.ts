@@ -3,7 +3,7 @@ import type {
   ExtensionContext,
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import { beforeEach, describe, expect, it, vi, type MockedFunction } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type MockedFunction } from "vitest";
 
 import type { LogEntry, ProcessInfo } from "../types.js";
 import type { ProcessManager } from "../process-manager.js";
@@ -11,12 +11,14 @@ import type { ProcessManager } from "../process-manager.js";
 // ── Hoisted mock state ──────────────────────────────────────────────────────
 
 const MockProcessManager = vi.hoisted(() => {
-  return vi.fn().mockImplementation(() => ({
-    onProcessCountChange: vi.fn(),
-    shutdown: vi.fn().mockResolvedValue(undefined),
-    list: vi.fn().mockReturnValue([]),
-    getLogs: vi.fn().mockReturnValue([]),
-  }));
+  return vi.fn().mockImplementation(function () {
+    return {
+      onProcessCountChange: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue(undefined),
+      list: vi.fn().mockReturnValue([]),
+      getLogs: vi.fn().mockReturnValue([]),
+    };
+  });
 });
 
 vi.mock("../process-manager.js", () => ({
@@ -66,11 +68,13 @@ vi.mock("../tools/restart-process.js", () => ({
 }));
 
 const mockLogDialog = vi.hoisted(() =>
-  vi.fn().mockImplementation(() => ({
-    setRequestRender: vi.fn(),
-    render: vi.fn(),
-    handleInput: vi.fn(),
-  })),
+  vi.fn().mockImplementation(function () {
+    return {
+      setRequestRender: vi.fn(),
+      render: vi.fn(),
+      handleInput: vi.fn(),
+    };
+  }),
 );
 vi.mock("../ui/log-dialog.js", () => ({
   LogDialog: mockLogDialog,
@@ -150,6 +154,10 @@ describe("index (extension entry point)", () => {
   // Re-import the module for each test so the closure state is fresh.
   let extension: (pi: ExtensionAPI) => void;
 
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
   beforeEach(async () => {
     const mod = await import("../index.js");
     extension = mod.default;
@@ -176,7 +184,7 @@ describe("index (extension entry point)", () => {
       const handler = handlers.get("session_start")!;
       await handler({}, ctx);
 
-      const instance = MockProcessManager.mock.results[0].value;
+      const instance = MockProcessManager.mock.results[0]!.value;
       expect(instance.onProcessCountChange).toHaveBeenCalledTimes(1);
     });
 
@@ -213,7 +221,7 @@ describe("index (extension entry point)", () => {
       const startHandler = handlers.get("session_start")!;
       await startHandler({}, createMockCtx());
 
-      const instance = MockProcessManager.mock.results[0].value;
+      const instance = MockProcessManager.mock.results[0]!.value;
 
       // Now trigger shutdown
       const shutdownHandler = handlers.get("session_shutdown")!;
@@ -318,8 +326,8 @@ describe("index (extension entry point)", () => {
       await handler({}, ctx);
 
       // Grab the callback registered via onProcessCountChange
-      const instance = MockProcessManager.mock.results[0].value;
-      const callback = instance.onProcessCountChange.mock.calls[0][0] as () => void;
+      const instance = MockProcessManager.mock.results[0]!.value;
+      const callback = instance.onProcessCountChange.mock.calls[0]![0] as () => void;
 
       // Make list() return some processes
       instance.list.mockReturnValue([{ name: "dev-server" }, { name: "watcher" }]);
@@ -337,8 +345,8 @@ describe("index (extension entry point)", () => {
       const handler = handlers.get("session_start")!;
       await handler({}, ctx);
 
-      const instance = MockProcessManager.mock.results[0].value;
-      const callback = instance.onProcessCountChange.mock.calls[0][0] as () => void;
+      const instance = MockProcessManager.mock.results[0]!.value;
+      const callback = instance.onProcessCountChange.mock.calls[0]![0] as () => void;
 
       instance.list.mockReturnValue([]);
 
@@ -355,8 +363,8 @@ describe("index (extension entry point)", () => {
       const handler = handlers.get("session_start")!;
       await handler({}, ctx);
 
-      const instance = MockProcessManager.mock.results[0].value;
-      const callback = instance.onProcessCountChange.mock.calls[0][0] as () => void;
+      const instance = MockProcessManager.mock.results[0]!.value;
+      const callback = instance.onProcessCountChange.mock.calls[0]![0] as () => void;
 
       instance.list.mockReturnValue([{ name: "dev-server" }]);
 
@@ -406,7 +414,7 @@ describe("index (extension entry point)", () => {
         createProcessLogsTool,
         createRestartProcessTool,
       ]) {
-        expect(typeof (factory as MockedFunction<any>).mock.calls[0][0]).toBe("function");
+        expect(typeof (factory as MockedFunction<any>).mock.calls[0]![0]).toBe("function");
       }
     });
   });
@@ -426,7 +434,7 @@ describe("index (extension entry point)", () => {
     it("shortcut handler returns early when hasUI is false", async () => {
       const { api, shortcuts } = createMockAPI();
       extension(api);
-      const handler = shortcuts[0].options.handler;
+      const handler = shortcuts[0]!.options.handler;
       const ctx = createMockCtx({ hasUI: false });
       await handler(ctx);
       expect(ctx.ui.custom).not.toHaveBeenCalled();
@@ -435,7 +443,7 @@ describe("index (extension entry point)", () => {
     it("shortcut handler returns early when manager is null", async () => {
       const { api, shortcuts } = createMockAPI();
       extension(api);
-      const handler = shortcuts[0].options.handler;
+      const handler = shortcuts[0]!.options.handler;
       const ctx = createMockCtx();
       await handler(ctx);
       expect(ctx.ui.custom).not.toHaveBeenCalled();
@@ -446,10 +454,10 @@ describe("index (extension entry point)", () => {
       extension(api);
       const startHandler = handlers.get("session_start")!;
       await startHandler({}, createMockCtx());
-      const instance = MockProcessManager.mock.results[0].value;
+      const instance = MockProcessManager.mock.results[0]!.value;
       instance.list.mockReturnValue([]);
 
-      const handler = shortcuts[0].options.handler;
+      const handler = shortcuts[0]!.options.handler;
       const ctx = createMockCtx();
       await handler(ctx);
       expect(ctx.ui.notify).toHaveBeenCalledWith("No processes running. Start one first.", "info");
@@ -460,11 +468,11 @@ describe("index (extension entry point)", () => {
       extension(api);
       const startHandler = handlers.get("session_start")!;
       await startHandler({}, createMockCtx());
-      const instance = MockProcessManager.mock.results[0].value;
+      const instance = MockProcessManager.mock.results[0]!.value;
       instance.list.mockReturnValue([{ name: "dev-server", pid: 12345 }]);
       instance.getLogs.mockReturnValue([]);
 
-      const handler = shortcuts[0].options.handler;
+      const handler = shortcuts[0]!.options.handler;
       const ctx = createMockCtx();
       await handler(ctx);
 
@@ -483,7 +491,7 @@ describe("index (extension entry point)", () => {
       extension(api);
       const startHandler = handlers.get("session_start")!;
       await startHandler({}, createMockCtx());
-      const instance = MockProcessManager.mock.results[0].value;
+      const instance = MockProcessManager.mock.results[0]!.value;
       instance.list.mockReturnValue([{ name: "dev-server" }]);
       instance.getLogs.mockReturnValue([]);
 
@@ -491,7 +499,7 @@ describe("index (extension entry point)", () => {
       const ctx = createMockCtx();
       ctx.ui.custom = vi.fn().mockResolvedValue({ selectedLogs, processName: "dev-server" });
 
-      const handler = shortcuts[0].options.handler;
+      const handler = shortcuts[0]!.options.handler;
       await handler(ctx);
 
       expect(ctx.ui.setEditorText).toHaveBeenCalledWith("[+00:00:01.000] [stdout] hello");
@@ -503,14 +511,14 @@ describe("index (extension entry point)", () => {
       extension(api);
       const startHandler = handlers.get("session_start")!;
       await startHandler({}, createMockCtx());
-      const instance = MockProcessManager.mock.results[0].value;
+      const instance = MockProcessManager.mock.results[0]!.value;
       instance.list.mockReturnValue([{ name: "dev-server" }]);
       instance.getLogs.mockReturnValue([]);
 
       const ctx = createMockCtx();
       ctx.ui.custom = vi.fn().mockResolvedValue(null);
 
-      const handler = shortcuts[0].options.handler;
+      const handler = shortcuts[0]!.options.handler;
       await handler(ctx);
 
       expect(ctx.ui.setEditorText).not.toHaveBeenCalled();

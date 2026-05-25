@@ -47,8 +47,8 @@ describe("createProcessLogsTool", () => {
     expect(manager.getLogs).toHaveBeenCalledWith("test-proc");
     expect((result.details as any).totalLines).toBe(10);
     expect((result.details as any).returnedLines).toBe(3);
-    expect(result.content[0].type).toBe("text");
-    const text1 = (result.content[0] as { type: "text"; text: string }).text;
+    expect(result.content[0]!.type).toBe("text");
+    const text1 = (result.content[0]! as { type: "text"; text: string }).text;
     expect(text1).toContain("[1]");
     expect(text1).toContain("[3]");
     expect(text1).not.toContain("[4]");

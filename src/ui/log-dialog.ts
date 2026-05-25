@@ -121,7 +121,9 @@ export class LogDialog {
 
     const parts: string[] = [];
     for (let i = 0; i < this.processes.length; i++) {
-      const name = this.processes[i].name;
+      const proc = this.processes[i];
+      if (proc === undefined) continue;
+      const name = proc.name;
       if (i === this.activeTabIndex) {
         parts.push(this.theme.fg("accent", this.theme.bold(name)));
       } else {
@@ -170,7 +172,10 @@ export class LogDialog {
     // Log lines
     const endIdx = Math.min(this.viewportOffset + viewportHeight, logs.length);
     for (let i = this.viewportOffset; i < endIdx; i++) {
-      lines.push(this.renderLogLine(logs[i], i, width));
+      const log = logs[i];
+      if (log !== undefined) {
+        lines.push(this.renderLogLine(log, i, width));
+      }
     }
 
     // Scroll indicator below

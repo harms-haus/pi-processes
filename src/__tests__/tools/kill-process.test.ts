@@ -35,9 +35,9 @@ describe("createKillProcessTool", () => {
     const result = await executeTool(tool, "call-1", { name: "my-server" });
 
     expect(result.content).toHaveLength(1);
-    expect(result.content[0].type).toBe("text");
+    expect(result.content[0]!.type).toBe("text");
     // 5432ms = 5.432s → toFixed(1) = "5.4"
-    const text = (result.content[0] as { type: "text"; text: string }).text;
+    const text = (result.content[0]! as { type: "text"; text: string }).text;
     expect(text).toContain("Process 'my-server' killed");
     expect(text).toContain("PID 12345");
     expect(text).toContain("5.4s");

@@ -67,8 +67,8 @@ describe("createRestartProcessTool", () => {
       const result = await executeTool(tool, "call-3", params);
 
       expect(result.content).toHaveLength(1);
-      expect(result.content[0].type).toBe("text");
-      const text = (result.content[0] as { type: "text"; text: string }).text;
+      expect(result.content[0]!.type).toBe("text");
+      const text = (result.content[0]! as { type: "text"; text: string }).text;
       expect(text).toContain("Process 'dev-server' restarted (PID 12345)");
       expect(text).toContain("Startup time: 3.2s");
       expect(text).toContain("Max log delay: 2s");

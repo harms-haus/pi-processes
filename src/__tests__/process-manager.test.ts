@@ -302,6 +302,16 @@ describe("ProcessManager", () => {
       const result = await killPromise;
       expect(result.name).toBe("test");
     });
+
+    it("throws if process has been cleaned up (null process, not exited)", async () => {
+      await startAndResolve(pm, "test", "sleep 10");
+
+      // Simulate the record being cleaned up but not marked as exited
+      const record = (pm as any).processes.get("test");
+      record.process = null;
+
+      await expect(pm.kill("test")).rejects.toThrow(/already been cleaned up/);
+    });
   });
 
   // ── restart() ─────────────────────────────────────────────────────────
@@ -399,7 +409,7 @@ describe("ProcessManager", () => {
 
       // Also reflected in list() as not running
       const list = pm.list();
-      expect(list[0].running).toBe(false);
+      expect(list[0]!.running).toBe(false);
     });
   });
 
@@ -498,7 +508,7 @@ describe("ProcessManager", () => {
       mockCp.emit("exit", 0, null);
 
       const list = pm.list();
-      expect(list[0].running).toBe(false);
+      expect(list[0]!.running).toBe(false);
     });
   });
 
@@ -526,9 +536,9 @@ describe("ProcessManager", () => {
 
       const logs = pm.getLogs("test");
       expect(logs).toHaveLength(1);
-      expect(logs[0].text).toBe("hello world");
-      expect(logs[0].stream).toBe("stdout");
-      expect(typeof logs[0].timestamp).toBe("number");
+      expect(logs[0]!.text).toBe("hello world");
+      expect(logs[0]!.stream).toBe("stdout");
+      expect(typeof logs[0]!.timestamp).toBe("number");
     });
   });
 
@@ -547,9 +557,9 @@ describe("ProcessManager", () => {
       const logs = pm.getLogs("test");
       expect(logs).toHaveLength(3);
       expect(logs.every((l) => l.stream === "stdout")).toBe(true);
-      expect(logs[0].text).toBe("line1");
-      expect(logs[1].text).toBe("line2");
-      expect(logs[2].text).toBe("line3");
+      expect(logs[0]!.text).toBe("line1");
+      expect(logs[1]!.text).toBe("line2");
+      expect(logs[2]!.text).toBe("line3");
     });
 
     it("creates LogEntry for each stderr line", async () => {
@@ -564,8 +574,8 @@ describe("ProcessManager", () => {
       const logs = pm.getLogs("test");
       expect(logs).toHaveLength(2);
       expect(logs.every((l) => l.stream === "stderr")).toBe(true);
-      expect(logs[0].text).toBe("err1");
-      expect(logs[1].text).toBe("err2");
+      expect(logs[0]!.text).toBe("err1");
+      expect(logs[1]!.text).toBe("err2");
     });
 
     it("handles mixed stdout and stderr output", async () => {
@@ -598,8 +608,8 @@ describe("ProcessManager", () => {
 
       const logs = pm.getLogs("test");
       expect(logs).toHaveLength(2);
-      expect(logs[0].text).toBe("hello");
-      expect(logs[1].text).toBe("world");
+      expect(logs[0]!.text).toBe("hello");
+      expect(logs[1]!.text).toBe("world");
     });
 
     it("resets debounce timer on each data event", async () => {
@@ -646,8 +656,8 @@ describe("ProcessManager", () => {
       const logs = pm.getLogs("test");
       expect(logs.length).toBe(MAX_LOG_ENTRIES);
       // Should keep the latest entries (sliding window)
-      expect(logs[0].text).toBe(`Line 101`);
-      expect(logs[logs.length - 1].text).toBe(`Line ${MAX_LOG_ENTRIES + 100}`);
+      expect(logs[0]!.text).toBe(`Line 101`);
+      expect(logs[logs.length - 1]!.text).toBe(`Line ${MAX_LOG_ENTRIES + 100}`);
     });
   });
 
@@ -856,8 +866,8 @@ describe("ProcessManager", () => {
 
       const logs = pm.getLogs("test");
       expect(logs).toHaveLength(1);
-      expect(logs[0].text).toBe("partial line");
-      expect(logs[0].stream).toBe("stdout");
+      expect(logs[0]!.text).toBe("partial line");
+      expect(logs[0]!.stream).toBe("stdout");
     });
 
     it("handles multiple complete lines in one chunk", async () => {
@@ -871,8 +881,8 @@ describe("ProcessManager", () => {
 
       const logs = pm.getLogs("test");
       expect(logs).toHaveLength(2);
-      expect(logs[0].text).toBe("line1");
-      expect(logs[1].text).toBe("line2");
+      expect(logs[0]!.text).toBe("line1");
+      expect(logs[1]!.text).toBe("line2");
     });
 
     it("handles mixed partial chunks across multiple emissions", async () => {
@@ -888,9 +898,9 @@ describe("ProcessManager", () => {
 
       const logs = pm.getLogs("test");
       expect(logs).toHaveLength(3);
-      expect(logs[0].text).toBe("A");
-      expect(logs[1].text).toBe("B");
-      expect(logs[2].text).toBe("CD");
+      expect(logs[0]!.text).toBe("A");
+      expect(logs[1]!.text).toBe("B");
+      expect(logs[2]!.text).toBe("CD");
     });
   });
 
@@ -1060,8 +1070,8 @@ describe("ProcessManager", () => {
       const logs = pm.getLogs("test");
       expect(logs).toHaveLength(1);
       // Should be truncated to MAX_LOG_LINE_BYTES + 3 ('...')
-      expect(logs[0].text.length).toBe(MAX_LOG_LINE_BYTES + 3);
-      expect(logs[0].text).toBe("x".repeat(MAX_LOG_LINE_BYTES) + "...");
+      expect(logs[0]!.text.length).toBe(MAX_LOG_LINE_BYTES + 3);
+      expect(logs[0]!.text).toBe("x".repeat(MAX_LOG_LINE_BYTES) + "...");
     });
 
     it("does not truncate normal-length lines", async () => {
@@ -1079,8 +1089,8 @@ describe("ProcessManager", () => {
 
       const logs = pm.getLogs("test");
       expect(logs).toHaveLength(1);
-      expect(logs[0].text).toBe(normalLine);
-      expect(logs[0].text.length).toBe(normalLine.length);
+      expect(logs[0]!.text).toBe(normalLine);
+      expect(logs[0]!.text.length).toBe(normalLine.length);
     });
   });
 

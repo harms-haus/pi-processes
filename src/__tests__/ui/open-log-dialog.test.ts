@@ -8,11 +8,13 @@ import type { ProcessManager } from "../../process-manager.js";
 // ── Hoisted mocks ───────────────────────────────────────────────────────────
 
 const mockLogDialog = vi.hoisted(() =>
-  vi.fn().mockImplementation(() => ({
-    setRequestRender: vi.fn(),
-    render: vi.fn(),
-    handleInput: vi.fn(),
-  })),
+  vi.fn().mockImplementation(function () {
+    return {
+      setRequestRender: vi.fn(),
+      render: vi.fn(),
+      handleInput: vi.fn(),
+    };
+  }),
 );
 vi.mock("../../ui/log-dialog.js", () => ({
   LogDialog: mockLogDialog,

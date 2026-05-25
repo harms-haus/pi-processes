@@ -45,8 +45,8 @@ describe("LogDialog", () => {
     processes: ProcessInfo[] = [],
     logsByProcess: Map<string, LogEntry[]> = new Map(),
   ): LogDialog {
-    const dialog = new LogDialog(processes, logsByProcess, theme, onDone);
-    dialog.setRequestRender(renderFn);
+    const dialog = new LogDialog(processes, logsByProcess, theme, onDone as any);
+    dialog.setRequestRender(renderFn as any);
     dialog.setContentHeight(20);
     return dialog;
   }
@@ -345,10 +345,10 @@ describe("LogDialog", () => {
       dialog.handleInput(KEYS.ctrlEnter);
 
       expect(onDone).toHaveBeenCalledTimes(1);
-      const result = onDone.mock.calls[0][0];
+      const result = onDone.mock.calls[0]![0];
       expect(result.processName).toBe("dev-server");
       expect(result.selectedLogs).toHaveLength(1);
-      expect(result.selectedLogs[0].text).toBe("Line 1");
+      expect(result.selectedLogs[0]!.text).toBe("Line 1");
     });
 
     it("calls onDone with multi-selected logs on Ctrl+Enter", () => {
@@ -362,11 +362,11 @@ describe("LogDialog", () => {
       dialog.handleInput(KEYS.ctrlEnter);
 
       expect(onDone).toHaveBeenCalledTimes(1);
-      const result = onDone.mock.calls[0][0];
+      const result = onDone.mock.calls[0]![0];
       expect(result.processName).toBe("dev-server");
       expect(result.selectedLogs).toHaveLength(2);
-      expect(result.selectedLogs[0].text).toBe("Line 1");
-      expect(result.selectedLogs[1].text).toBe("Line 2");
+      expect(result.selectedLogs[0]!.text).toBe("Line 1");
+      expect(result.selectedLogs[1]!.text).toBe("Line 2");
     });
 
     it("does not call onDone on Ctrl+Enter when no logs", () => {
